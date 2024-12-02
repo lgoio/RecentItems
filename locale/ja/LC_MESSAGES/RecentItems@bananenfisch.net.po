@@ -1,0 +1,44 @@
+msgid ""
+msgstr ""
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-12-02 20:51+0100\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+#: extension.js:119
+msgid "Private mode"
+msgstr "プライベートモード"
+
+#: extension.js:279
+msgid "No items found"
+msgstr ""
+
+#: extension.js:312
+msgid "Search..."
+msgstr "検索..."
+
+#: prefs.js:15
+msgid "Recent Item Settings"
+msgstr "最近のアイテム設定"
+
+#: prefs.js:22
+msgid "Settings"
+msgstr "設定"
+
+#: prefs.js:41
+msgid "Item Count"
+msgstr "アイテム数"
+
+#: prefs.js:66
+msgid "Mime Blacklist"
+msgstr "MIMEブラックリスト"
+
+#: prefs.js:67
+msgid "Seperate with comma"
+msgstr "カンマで区切る"
+
+#: prefs.js:68
+msgid "Example: image,audio,video"
+msgstr "例: image,audio,video"
+
+#~ msgid "Clear all recent items"
+#~ msgstr "すべての最近のアイテムをクリア"

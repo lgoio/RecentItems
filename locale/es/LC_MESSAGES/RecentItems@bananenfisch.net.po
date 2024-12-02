@@ -1,0 +1,44 @@
+msgid ""
+msgstr ""
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-12-02 20:51+0100\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+#: extension.js:119
+msgid "Private mode"
+msgstr "Modo privado"
+
+#: extension.js:279
+msgid "No items found"
+msgstr ""
+
+#: extension.js:312
+msgid "Search..."
+msgstr "Buscar..."
+
+#: prefs.js:15
+msgid "Recent Item Settings"
+msgstr "Configuración de elementos recientes"
+
+#: prefs.js:22
+msgid "Settings"
+msgstr "Configuración"
+
+#: prefs.js:41
+msgid "Item Count"
+msgstr "Recuento de elementos"
+
+#: prefs.js:66
+msgid "Mime Blacklist"
+msgstr "Lista negra MIME"
+
+#: prefs.js:67
+msgid "Seperate with comma"
+msgstr "Separar con coma"
+
+#: prefs.js:68
+msgid "Example: image,audio,video"
+msgstr "Ejemplo: image,audio,video"
+
+#~ msgid "Clear all recent items"
+#~ msgstr "Borrar todos los elementos recientes"

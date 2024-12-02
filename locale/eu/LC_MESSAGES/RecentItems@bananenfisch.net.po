@@ -1,0 +1,44 @@
+msgid ""
+msgstr ""
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-12-02 20:51+0100\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+#: extension.js:119
+msgid "Private mode"
+msgstr "Modu pribatua"
+
+#: extension.js:279
+msgid "No items found"
+msgstr ""
+
+#: extension.js:312
+msgid "Search..."
+msgstr "Bilatu..."
+
+#: prefs.js:15
+msgid "Recent Item Settings"
+msgstr "Azken elementuen ezarpenak"
+
+#: prefs.js:22
+msgid "Settings"
+msgstr "Ezarpenak"
+
+#: prefs.js:41
+msgid "Item Count"
+msgstr "Elementu kopurua"
+
+#: prefs.js:66
+msgid "Mime Blacklist"
+msgstr "MIME beltzaren zerrenda"
+
+#: prefs.js:67
+msgid "Seperate with comma"
+msgstr "Koma batekin bereizi"
+
+#: prefs.js:68
+msgid "Example: image,audio,video"
+msgstr "Adibidea: image,audio,video"
+
+#~ msgid "Clear all recent items"
+#~ msgstr "Ezabatu azken elementu guztiak"

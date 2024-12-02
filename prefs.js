@@ -54,34 +54,6 @@ export default class RecentItemsPreferences extends ExtensionPreferences {
     itemCountBox.append(widget);
     group.add(itemCountBox);
 
-    // More Item Count
-    const moreItemCountBox = new Gtk.Box({
-      orientation: Gtk.Orientation.HORIZONTAL,
-      spacing: 10,
-      margin_start: 10,
-      margin_end: 10,
-      margin_top: 10,
-      margin_bottom: 10,
-    });
-
-    label = new Gtk.Label({
-      label: _("More Item Count"),
-      hexpand: true,
-      halign: Gtk.Align.START,
-    });
-
-    widget = new Gtk.SpinButton({ halign: Gtk.Align.END });
-    widget.set_sensitive(true);
-    widget.set_range(0, 50);
-    widget.set_increments(1, 2);
-
-    window._settings.bind("more-item-count", widget, "value", Gio.SettingsBindFlags.DEFAULT);
-
-    moreItemCountBox.append(label);
-    moreItemCountBox.append(widget);
-
-    group.add(moreItemCountBox);
-
     // Item Blacklist
     const itemBlacklistBox = new Gtk.Box({
       orientation: Gtk.Orientation.HORIZONTAL,
@@ -91,9 +63,12 @@ export default class RecentItemsPreferences extends ExtensionPreferences {
       margin_top: 10,
       margin_bottom: 10,
     });
-
+    
+    const mimeBlacklist = _("Mime Blacklist"	);
+    const seperateWithComma = _("Seperate with comma"	);
+    const mimeExamples = _("Example: image,audio,video");
     label = new Gtk.Label({
-      label: _("Item Blacklist\nSeperate with comma\nExample: image,audio,video"),
+      label: mimeBlacklist +"\n" +  seperateWithComma + "\n" + mimeExamples,
       hexpand: true,
       halign: Gtk.Align.START,
     });

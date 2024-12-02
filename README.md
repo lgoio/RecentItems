@@ -1,12 +1,58 @@
-# RecentItems
+# RecentItems (Enhanced Fork)
+
+## About This Fork
+
+This fork enhances the original RecentItems GNOME extension with the following features and improvements:
+
+### Completed TODOs from the Original Plugin:
+- **Search Input Field:** Easily filter recent items using a search box at the top.
+- **Simple Float-Right Icon:** A straightforward icon to the right of each item allows quick removal.
+
+### New Features in This Fork:
+- **Private Mode:** A mode to ensure that no new items are saved to the Recent Manager while active.
+- **Blacklist Support:** Block specific MIME types and remove corresponding entries from `Gtk.RecentManager` automatically.
+- **Installation via `make install`:** Simplifies installation by automating schema compilation and setup.
+- **Bundle Creation via `make bundle`:** Generates a `bundle.zip` for easy distribution.
+- **Translations for Multiple Languages:** 
+  - Supported languages include:
+    - `ar`, `ca`, `cs`, `de`, `el`, `es`, `eu`, `fa`, `fi`, `fr`, `hu`, `it`, `ja`, `nl`, `oc`, `pl`, `pt_BR`, `ru`, `sk`, `tr`, `uk`, `zh_CN`
+- **Pagination with `<` and `>` Instead of "More":** Navigate recent items using previous/next buttons for a more intuitive experience.
+
+## Installation Instructions
+
+### Using `bundle.zip` (Recommended)
+
+1. **Extract the Archive:**
+   - Extract the `bundle.zip` file into the following directory:
+     ```plaintext
+     ~/.local/share/gnome-shell/extensions/RecentItems@bananenfisch.net
+     ```
+   - Ensure the folder is named `RecentItems@bananenfisch.net`.
+
+2. **Compile Schemas:**
+   - Run the following command to compile schemas for the extension:
+     ```bash
+     glib-compile-schemas ~/.local/share/gnome-shell/extensions/RecentItems@bananenfisch.net/schemas
+     ```
+
+3. **Restart GNOME Shell:**
+   - Press `Alt + F2`, type `r`, and press Enter.
+   - Alternatively, log out and log back in.
+
+4. **Enable the Extension:**
+   - Open GNOME Extensions or GNOME Tweaks and enable **Recent Items**.
+
+## Manual Installation (Alternative)
+
+If you prefer to install from the source code, follow these steps:
+
+1. Clone or download the repository:
+   ```bash
+   git clone https://github.com/bananenfisch/RecentItems.git
+   cd RecentItems
+   make install
 
 ## Important: this extension is not being updated on extensions.gnome.org for now
-
-### tl;dr
-You need to install the extension manually:
-1. download the latest release
-2. extract the folder to ~/.local/share/gnome-shell/extensions/RecentItems@bananenfisch.net
-3. compile schemas, commandline: `glib-compile-schemas ~/.local/share/gnome-shell/extensions/RecentItems@bananenfisch.net/schemas`
 
 ### Why?
 The latest "GNOME Shell Extensions Review Guidelines" [https://gjs.guide/extensions/review-guidelines/review-guidelines.html#do-not-import-gtk-libraries-in-gnome-shell]:
@@ -32,7 +78,5 @@ So until there is no better solution, i will maintain this extension, but cannot
 
 - Do not list deleted files
 - shortcut, like \<super\>+r
-- search input field
 - hide button after cleaning
-- simple float right icon to remove an item from list
 - option to pin files on top?
