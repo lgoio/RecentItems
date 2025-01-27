@@ -5,11 +5,66 @@ SCRIPT_PATH="$(cd "$SCRIPT_PATH" && pwd)"
 
 # Define the output directory and domain
 LOCALE_DIR="$SCRIPT_PATH/locale"
-DOMAIN="$(basename "$SCRIPT_PATH")"
+DOMAIN=$(grep '"uuid":' $SCRIPT_PATH/metadata.json | sed -E 's/.*"uuid": "([^"]+)".*/\1/')
 
 if [ -d "$LOCALE_DIR" ]; then
 	rm -Rf "$LOCALE_DIR"
 fi
+
+
+
+
+declare -A page_of=(
+  ["en"]="%x of %y"
+  ["ar"]="%x من %y"
+  ["ca"]="%x de %y"
+  ["cs"]="%x z %y"
+  ["de"]="%x von %y"
+  ["el"]="%x από %y"
+  ["es"]="%x de %y"
+  ["eu"]="%x tik %y"
+  ["fa"]="%x از %y"
+  ["fi"]="%x / %y"
+  ["fr"]="%x sur %y"
+  ["hu"]="%x az %y"
+  ["it"]="%x di %y"
+  ["ja"]="%y 中の %x"
+  ["nl"]="%x van %y"
+  ["oc"]="%x de %y"
+  ["pl"]="%x z %y"
+  ["pt_BR"]="%x de %y"
+  ["ru"]="%x из %y"
+  ["sk"]="%x z %y"
+  ["tr"]="%x / %y"
+  ["uk"]="%x з %y"
+  ["zh_CN"]="第 %x，共 %y"
+)
+
+declare -A window_width_percentage=(
+  ["en"]="Window width (%)"
+  ["ar"]="عرض النافذة (%)"
+  ["ca"]="Amplada de la finestra (%)"
+  ["cs"]="Šířka okna (%)"
+  ["de"]="Fensterbreite (%)"
+  ["el"]="Πλάτος παραθύρου (%)"
+  ["es"]="Ancho de ventana (%)"
+  ["eu"]="Leihoaren zabalera (%)"
+  ["fa"]="عرض پنجره (%)"
+  ["fi"]="Ikkunan leveys (%)"
+  ["fr"]="Largeur de la fenêtre (%)"
+  ["hu"]="Ablak szélessége (%)"
+  ["it"]="Larghezza finestra (%)"
+  ["ja"]="ウィンドウの幅 (%)"
+  ["nl"]="Vensterbreedte (%)"
+  ["oc"]="Largor de la fenèstra (%)"
+  ["pl"]="Szerokość okna (%)"
+  ["pt_BR"]="Largura da janela (%)"
+  ["ru"]="Ширина окна (%)"
+  ["sk"]="Šírka okna (%)"
+  ["tr"]="Pencere genişliği (%)"
+  ["uk"]="Ширина вікна (%)"
+  ["zh_CN"]="窗口宽度 (%)"
+)
 
 # Define translations for each string
 declare -A private_mode=(
@@ -257,7 +312,7 @@ for lang in "ar" "ca" "cs" "de" "el" "es" "eu" "fa" "fi" "fr" "hu" "it" "ja" "nl
   echo "msgid \"\"" > "$PO_FILE"
   echo "msgstr \"\"" >> "$PO_FILE"
   echo "\"Content-Type: text/plain; charset=UTF-8\"" >> "$PO_FILE"
-  for key in private_mode clear_all_recent_items recent_item_settings settings mime_blacklist  separate_with_comma mime_blacklist_example search item_count; do
+  for key in page_of window_width_percentage private_mode clear_all_recent_items recent_item_settings settings mime_blacklist  separate_with_comma mime_blacklist_example search item_count; do
     declare -n translations=$key
     echo "" >> "$PO_FILE"
     echo "msgid \"${translations[en]}\"" >> "$PO_FILE"

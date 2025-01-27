@@ -5,5 +5,5 @@
   "url": "https://github.com/bananenfisch/RecentItems",
   "settings-schema": "org.gnome.shell.extensions.recent-items",
   "shell-version": ["46"],
-  "version": 28
+  "version": 29
 }

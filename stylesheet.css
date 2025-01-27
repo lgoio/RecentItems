@@ -1,0 +1,28 @@
+/* stylesheet.css */
+
+.item-deleted {
+    opacity: 0.5; /* Make the item semi-transparent */
+    text-decoration: line-through; /* Strike-through text */
+    color: gray; /* Dim color for deleted items */
+}
+
+.item-deleted:hover {
+    opacity: 0.8; /* Slightly highlight when hovered */
+}
+.search-entry {
+    max-width: 100%;
+    width: 100%; /* Ensure it matches the parent container's width */
+}
+  
+.number-entry {
+    max-width: 100%;
+    width: 100%; /* Similarly limit number entry width */
+}
+
+.popup-menu-section {
+    padding: 0 10px; /* Add padding for better alignment */
+}
+
+.item-box {
+    max-width: 100%; /* Prevent overflowing content */
+}

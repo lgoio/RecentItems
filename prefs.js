@@ -24,8 +24,41 @@ export default class RecentItemsPreferences extends ExtensionPreferences {
 
     page.add(group);
 
+
+
     let label = null;
     let widget = null;
+    
+    // Item count
+    const windowWidthBox = new Gtk.Box({
+      orientation: Gtk.Orientation.HORIZONTAL,
+      spacing: 10,
+      margin_start: 10,
+      margin_end: 10,
+      margin_top: 10,
+      margin_bottom: 10,
+    });
+
+    label = new Gtk.Label({
+      label: _('Window width (%)'),
+      hexpand: true,
+      halign: Gtk.Align.START,
+    });
+    
+    widget =new Gtk.SpinButton({
+      adjustment: new Gtk.Adjustment({
+        lower: 0,
+        upper: 100,
+        step_increment: 5,
+      }),
+    });
+    
+    
+    window._settings.bind("window-width-percentage", widget, "value", Gio.SettingsBindFlags.DEFAULT);
+
+    windowWidthBox.append(label);
+    windowWidthBox.append(widget);
+    group.add(windowWidthBox);
 
     // Item count
     const itemCountBox = new Gtk.Box({
@@ -36,7 +69,7 @@ export default class RecentItemsPreferences extends ExtensionPreferences {
       margin_top: 10,
       margin_bottom: 10,
     });
-
+    
     label = new Gtk.Label({
       label: _("Item Count"),
       hexpand: true,

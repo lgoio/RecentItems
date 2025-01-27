@@ -1,4 +1,4 @@
-MODULES = metadata.json extension.js prefs.js LICENSE README.md schemas/
+MODULES = metadata.json recentManager.js extension.js prefs.js stylesheet.css LICENSE README.md schemas/
 INSTALLPATH = ~/.local/share/gnome-shell/extensions/RecentItems@bananenfisch.net/
 
 all: compile-settings compile-locales

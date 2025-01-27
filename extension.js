@@ -9,7 +9,6 @@
     (at your option) any later version. <http://www.gnu.org/licenses/>
 */
 import Clutter from 'gi://Clutter';
-import Gtk from 'gi://Gtk';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
@@ -18,6 +17,9 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import { Extension, gettext as _ } from 'resource:///org/gnome/shell/extensions/extension.js';
+import RecentManager from "./recentManager.js";
+
+
 
 export default class RecentItemsExtension extends Extension {
   constructor(metadata) {
@@ -27,6 +29,13 @@ export default class RecentItemsExtension extends Extension {
   enable() {
     this._settings = this.getSettings();
     this.rec = new RecentItems(this);
+
+
+    // Add custom stylesheet
+    const themeContext = St.ThemeContext.get_for_stage(global.stage);
+    const cssFile = `${this.dir.get_path()}/stylesheet.css`;
+    const file = Gio.File.new_for_path(cssFile);
+    themeContext.get_theme().load_stylesheet(file);
   }
 
   disable() {
@@ -61,6 +70,7 @@ const RecentItems = GObject.registerClass(
     constructor(extension) {
       super(0.0);
       this._extension = extension;
+      this._setMenuWidth();
       this._iconActor = new St.Icon({
         icon_name: 'document-open-recent-symbolic',
         style_class: 'system-status-icon',
@@ -72,12 +82,12 @@ const RecentItems = GObject.registerClass(
       this.itemBox = new PopupMenu.PopupMenuSection({ reactive: false, can_focus: false });
       this.menu.addMenuItem(this.itemBox, 0);
 
-      this.RecentManager = Gtk.RecentManager.get_default();
-      this._allItems = this.RecentManager.get_items(); // Store all items
+      this.recentManager = new RecentManager();
+      this._allItems = this.recentManager.get_items(); // Store all items
       this._searchTerm = ''; // Initialize search term
       this._searchQuery = ''; // Initialize search query
       this._page = 0; // Pagination index
-      this._private_mode = this._extension._settings.get_boolean("private-mode");
+      this._num_page = 0; // Number of pages
       this._isSyncing = false; // Mutex flag for syncing
       this.cleanPrivateModeTimeoutID = null;
 
@@ -91,42 +101,102 @@ const RecentItems = GObject.registerClass(
       actionsSection.actor.add_child(actionsBox);
 
       // Add "Previous Page" button
-      const prevPage = new PopupMenu.PopupBaseMenuItem();
-      prevPage.add_child(
+      this.prevPage = new PopupMenu.PopupBaseMenuItem();
+      this.prevPage.add_child(
         new St.Icon({
           icon_name: 'go-previous-symbolic',
           style_class: 'popup-menu-icon',
         }),
       );
-      prevPage.connect('activate', this._navigatePrevPage.bind(this));
-      actionsBox.add_child(prevPage);
-
+      actionsBox.add_child(this.prevPage);
+      
       // Add "Next Page" button
-      const nextPage = new PopupMenu.PopupBaseMenuItem();
-      nextPage.add_child(
+      this.nextPage = new PopupMenu.PopupBaseMenuItem();
+      this.nextPage.add_child(
         new St.Icon({
           icon_name: 'go-next-symbolic',
           style_class: 'popup-menu-icon',
         }),
       );
-      nextPage.connect('activate', this._navigateNextPage.bind(this));
-      actionsBox.add_child(nextPage);
+      actionsBox.add_child(this.nextPage);
+
+      this._prevPageSignalId = this.prevPage.connect('activate', this._navigatePrevPage.bind(this));
+      this._nextPageSignalId = this.nextPage.connect('activate', this._navigateNextPage.bind(this));
+
+
+      // Create a new numeric entry
+      this.page_input = new St.Entry({
+        style_class: 'number-entry',
+        hint_text: this._page + ' of ' + this._num_page, // Placeholder text
+        can_focus: true,
+        track_hover: true,
+      });
+      this.page_input.get_clutter_text().connect('text-changed', () => {
+        const clutterText = this.page_input.get_clutter_text();
+        const currentText = clutterText.get_text();
+
+        // Restrict input to digits only
+        if (!/^\d*$/.test(currentText)) {
+          clutterText.set_text(currentText.replace(/\D/g, '')); // Remove non-digit characters
+          return;
+        }
+
+        // Check if input is non-empty
+        if (currentText !== "") {
+          // Wait for 1 second or Enter key press to process the input
+          if (this._pageTimeoutId) {
+            GLib.source_remove(this._pageTimeoutId); // Reset the timeout if the user continues typing
+          }
+
+          this._pageTimeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1000, () => {
+            const pageNumber = parseInt(currentText, 10) - 1; // Convert input to zero-based index
+            if (!isNaN(pageNumber)) {
+              this._page = Math.max(0, Math.min(pageNumber, this._num_page)); // Clamp the page number within range
+              clutterText.set_text(""); // Clear input after processing
+              this._sync(); // Update the view
+            }
+            this._pageTimeoutId = null; // Clear the timeout ID
+            return GLib.SOURCE_REMOVE; // Ensure the timeout runs only once
+          });
+        }
+      });
+
+      // Handle the "Enter" key for immediate page change
+      this.page_input.get_clutter_text().connect('key-press-event', (_, event) => {
+        const symbol = event.get_key_symbol();
+        if (symbol === Clutter.KEY_Return || symbol === Clutter.KEY_KP_Enter) {
+          const pageNumber = parseInt(this.page_input.get_text(), 10) - 1;
+          if (!isNaN(pageNumber)) {
+            this._page = Math.max(0, Math.min(pageNumber, this._num_page)); // Clamp within range
+            this.page_input.set_text(""); // Clear input
+            this._sync(); // Update the view
+          }
+          return Clutter.EVENT_STOP; // Stop event propagation
+        }
+        return Clutter.EVENT_PROPAGATE;
+      });
+      actionsBox.add_child(this.page_input);
 
       actionsBox.add_child(new St.BoxLayout({ x_expand: true }));
 
       // Add "Private Mode" toggle
       this.privateModeMenuItem = new PopupMenu.PopupSwitchMenuItem(
         _('Private mode'),
-        this._private_mode,
+        this._extension._settings.get_boolean("private-mode"),
         { reactive: true },
       );
       this.privateModeMenuItem.connect('toggled', () => {
-        this._allItems = this.RecentManager.get_items();
-
+        this._allItems = this.recentManager.get_items();
         this._extension._settings.set_boolean(
           "private-mode",
           this.privateModeMenuItem.state,
         );
+        // Adjust icon opacity based on private mode state
+        if (this.privateModeMenuItem.state) {
+          this._iconActor.opacity = 100; // Dim the icon when private mode is active
+        } else {
+          this._iconActor.opacity = 255; // Restore full opacity when private mode is inactive
+        }
       });
       actionsBox.add_child(this.privateModeMenuItem);
 
@@ -145,23 +215,57 @@ const RecentItems = GObject.registerClass(
       this.menu.addMenuItem(actionsSection);
       this._addSearchField();
 
-      this.changeHandler = this.RecentManager.connect('changed', () => this._sync());
-      this.settingsChangeHandler = this._extension._settings.connect('changed', () => this._sync());
+      this.menu.connect('open-state-changed', (self, open) => {
+        if (open) {
+          this._setMenuWidth();
+          this._page = 0; // Set the page to 0 when the menu opens
+          this.searchEntry.set_text('');
+          this._searchFocusHackCallbackId = GLib.timeout_add(
+            GLib.PRIORITY_DEFAULT,
+            1,
+            () => {
+              global.stage.set_key_focus(this.searchEntry);
+              this._searchFocusHackCallbackId = undefined;
+              return false;
+            },
+          );
+          this._sync();
+        }
+      });
 
+      this.changeHandler = this.recentManager.connect('changed', () => this._sync());
+      this.settingsChangeHandler = this._extension._settings.connect('changed', () => {
+        this._setMenuWidth(); this._sync();
+      });
+
+      // Scroll-Drosselung
+      this._scrollThrottle = false;
+
+      // Scroll-Event verbinden
+      this._scrollEventId=this.menu.actor.connect('scroll-event', (_, event) => {
+        this._onScroll(event);
+        return Clutter.EVENT_STOP; // Konsumiere das Event
+      });
       Main.panel.addToStatusArea(this._extension.uuid, this);
+
     }
 
-    destroy() {
-      this._extension._settings.disconnect(this.settingsChangeHandler);
-      this.RecentManager.disconnect(this.changeHandler);
-      this.RecentManager = null;
-      if (this._searchFocusHackCallbackId) {
-        GLib.Source.source_remove(this._searchFocusHackCallbackId);
-        this._searchFocusHackCallbackId = undefined;
+    _setMenuWidth() {
+      const display = global.display;
+      const screenWidth = display.get_monitor_geometry(
+        display.get_primary_monitor()
+      ).width;
+    
+      this.window_width_percentage = this._extension._settings.get_int("window-width-percentage");
+      const menuWidth = Math.round(screenWidth * (this.window_width_percentage / 100));
+      
+      this.menu.actor.set_width(menuWidth);
+      
+      // Ensure child elements respect this width
+      if (this.searchEntry) {
+        this.searchEntry.set_width(menuWidth - 40); // Adjust for padding
       }
-      super.destroy();
     }
-
     _onSearchTextChanged() {
       const query = this.searchEntry.get_text();
 
@@ -177,10 +281,9 @@ const RecentItems = GObject.registerClass(
     }
 
     _addRecentMenuItem(item, itemContainer) {
-      const item_type = item.get_mime_type();
+      const item_type = item.mime_type;
       const gicon = Gio.content_type_get_icon(item_type);
-      const uri = item.get_uri();
-
+      const uri = item.uri;
       // Create a container for the menu item
       const menuBox = new St.BoxLayout({
         style_class: 'item-box',
@@ -194,10 +297,14 @@ const RecentItems = GObject.registerClass(
 
       // Add a label
       const label = new St.Label({
-        text: item.get_display_name(),
+        text: item.displayName,
         x_expand: true,
         x_align: Clutter.ActorAlign.START,
       });
+      if (!item.exist)
+        label.set_style_class_name("item-deleted");
+
+
       menuBox.add_child(label);
 
       // Add a "Delete" button
@@ -216,27 +323,32 @@ const RecentItems = GObject.registerClass(
       // Make the entire item clickable
       const menuItem = new PopupMenu.PopupBaseMenuItem();
       menuItem.add_child(menuBox);
-      menuItem.connect('activate', (_, ev) => {
+      menuItem._activateSignalId = menuItem.connect('activate', (_, ev) => {
         this._launchFile(uri, ev);
       });
       itemContainer.addMenuItem(menuItem);
     }
 
     _sync() {
-      this._private_mode = this._extension._settings.get_boolean("private-mode");
+      const items = this.itemBox._getMenuItems();
+      for (const item of items) {
+        if (item._activateSignalId) {
+          item.disconnect(item._activateSignalId);
+        }
+      }
       this.itemBox.removeAll();
 
-      if (!this._private_mode) {
-        this._allItems = this.RecentManager.get_items();
+      if (!this.privateModeMenuItem.state) {
+        this._allItems = this.recentManager.get_items();
       } else {
-        const tmpAllItems = this.RecentManager.get_items();
+        const tmpAllItems = this.recentManager.get_items();
         for (const item of tmpAllItems) {
-          const uri = item.get_uri();
+          const uri = item.uri;
 
           // Remove item if not in the current list
-          if (!this._allItems.some(existingItem => existingItem.get_uri() === uri)) {
+          if (!this._allItems.some(existingItem => existingItem.uri === uri)) {
             // console.log("Remove item in private mode: " + uri);
-            this.RecentManager.remove_item(uri);
+            this.recentManager.remove_item(uri);
             return;
           }
         }
@@ -247,10 +359,10 @@ const RecentItems = GObject.registerClass(
       const blacklistList = itemBlacklist.replace(/\s/g, "").split(",");
 
       for (const item of this._allItems) {
-        if (blacklistList.indexOf(item.get_mime_type().split("/")[0]) !== -1) {
-          const uri = item.get_uri();
+        if (blacklistList.indexOf(item.mime_type.split("/")[0]) !== -1) {
+          const uri = item.uri;
           // console.log("Remove blacklisted item: " + uri);
-          this.RecentManager.remove_item(uri);
+          this.recentManager.remove_item(uri);
           return;
         }
       }
@@ -260,10 +372,11 @@ const RecentItems = GObject.registerClass(
 
       if (countItem > 0) {
         const showItemCount = this._extension._settings.get_int('item-count');
-        this._num_page = Math.floor(countItem / showItemCount);
+        this._num_page = Math.ceil(countItem / showItemCount) - 1;
+        this.page_input.set_hint_text( _('%x of %y').replace('%x', this._page + 1).replace('%y', this._num_page + 1));
         let modlist = [];
         for (let i = 0; i < countItem; i++) {
-          modlist[i] = [filteredItems[i].get_modified().to_unix(), i];
+          modlist[i] = [Math.max(filteredItems[i].visited, filteredItems[i].modified), i];
         }
 
         modlist.sort((x, y) => y[0] - x[0]);
@@ -306,7 +419,7 @@ const RecentItems = GObject.registerClass(
         vertical: false,
         x_expand: true,
       });
-
+    
       this.searchEntry = new St.Entry({
         style_class: 'search-entry',
         hint_text: _('Search...'),
@@ -315,36 +428,27 @@ const RecentItems = GObject.registerClass(
         x_expand: true,
         y_expand: true,
       });
+    
+      // Adjust search entry width dynamically
+      const menuWidth = this.menu.actor.get_width();
+      this.searchEntry.set_width(menuWidth - 40); // Account for padding
+    
       this.searchEntry
         .get_clutter_text()
         .connect('text-changed', this._onSearchTextChanged.bind(this));
+    
       searchBox.add_child(this.searchEntry);
-
+    
       const searchMenuItem = new PopupMenu.PopupBaseMenuItem({ reactive: false, can_focus: false });
       searchMenuItem.add_child(searchBox);
       this.menu.addMenuItem(searchMenuItem);
-
-      this.menu.connect('open-state-changed', (self, open) => {
-        if (open) {
-          this.searchEntry.set_text('');
-          this._searchFocusHackCallbackId = GLib.timeout_add(
-            GLib.PRIORITY_DEFAULT,
-            1,
-            () => {
-              global.stage.set_key_focus(this.searchEntry);
-              this._searchFocusHackCallbackId = undefined;
-              return false;
-            },
-          );
-        }
-      });
     }
 
     _filterItems(searchTerm, blacklistList) {
       if (!searchTerm || searchTerm === "")
         return this._allItems;
 
-      return this._allItems.filter(item => item.get_display_name().toLowerCase().includes(searchTerm));
+      return this._allItems.filter(item => item.displayName.toLowerCase().includes(searchTerm));
     }
 
     _launchFile(uri, ev) {
@@ -356,14 +460,121 @@ const RecentItems = GObject.registerClass(
       );
     }
 
+    _onScroll(event) {
+      // Wenn das Scrollen gerade blockiert ist, ignorieren
+      if (this._scrollThrottle) return;
+
+      const direction = event.get_scroll_direction();
+  
+      if (direction === Clutter.ScrollDirection.UP) {
+        this._navigatePrevPage();
+      } else if (direction === Clutter.ScrollDirection.DOWN) {
+        this._navigateNextPage();
+      } else {
+        return;
+      }
+  
+      // Scroll-Drosselung aktivieren
+      this._scrollThrottle = true;
+  
+      // Drosselung nach 300 ms zurücksetzen
+      this._scrollThrottleTimeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 300, () => {
+        this._scrollThrottle = false;
+        return GLib.SOURCE_REMOVE; // Timeout nur einmal ausführen
+      });
+    }
+  
     _deleteItem(uri) {
-      this.RecentManager.remove_item(uri);
+      this.recentManager.remove_item(uri);
     }
 
     _clearAll() {
-      this.RecentManager.purge_items();
+      this.recentManager.purge_items();
       this._searchTerm = '';
       this._searchQuery = '';
+    }
+    destroy() {
+      const items = this.itemBox._getMenuItems();
+      for (const item of items) {
+        if (item._activateSignalId) {
+          item.disconnect(item._activateSignalId);
+        }
+      }
+      this.itemBox.removeAll();
+      // Disconnect settings handler
+      if (this.settingsChangeHandler) {
+        this._extension._settings.disconnect(this.settingsChangeHandler);
+        this.settingsChangeHandler = null;
+      }
+    
+      // Disconnect recent manager signal handler
+      if (this.changeHandler) {
+        this.recentManager.disconnect(this.changeHandler);
+        this.changeHandler = null;
+      }
+    
+      // Destroy the recent manager instance
+      if (this.recentManager) {
+        this.recentManager.destroy();
+        this.recentManager = null;
+      }
+    
+      // Remove scroll throttle timeout
+      if (this._scrollThrottleTimeoutId) {
+        GLib.Source.remove(this._scrollThrottleTimeoutId);
+        this._scrollThrottleTimeoutId = null;
+      }
+    
+      // Remove page input timeout
+      if (this._pageTimeoutId) {
+        GLib.Source.remove(this._pageTimeoutId);
+        this._pageTimeoutId = null;
+      }
+    
+      // Remove search focus timeout
+      if (this._searchFocusHackCallbackId) {
+        GLib.Source.remove(this._searchFocusHackCallbackId);
+        this._searchFocusHackCallbackId = null;
+      }
+    
+      // Disconnect scroll event handler
+      if (this._scrollEventId && this.menu.actor) {
+        this.menu.actor.disconnect(this._scrollEventId);
+        this._scrollEventId = null;
+      }
+    
+      // Disconnect specific signal handlers for prevPage and nextPage
+      if (this._prevPageSignalId) {
+        this.prevPage.disconnect(this._prevPageSignalId);
+        this._prevPageSignalId = null;
+      }
+    
+      if (this._nextPageSignalId) {
+        this.nextPage.disconnect(this._nextPageSignalId);
+        this._nextPageSignalId = null;
+      }
+    
+      // Disconnect page input text and key event handlers
+      if (this.page_input && this.page_input.get_clutter_text()) {
+        const clutterText = this.page_input.get_clutter_text();
+        if (this._pageInputTextChangedId) {
+          clutterText.disconnect(this._pageInputTextChangedId);
+          this._pageInputTextChangedId = null;
+        }
+        if (this._pageInputKeyPressId) {
+          clutterText.disconnect(this._pageInputKeyPressId);
+          this._pageInputKeyPressId = null;
+        }
+      }
+    
+      // Disconnect private mode toggle
+      if (this._privateModeToggleId) {
+        this.privateModeMenuItem.disconnect(this._privateModeToggleId);
+        this._privateModeToggleId = null;
+      }
+    
+      // Call parent destroy method
+      super.destroy();
     }
   },
 );

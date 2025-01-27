@@ -9,6 +9,7 @@ This fork enhances the original RecentItems GNOME extension with the following f
 - **Simple Float-Right Icon:** A straightforward icon to the right of each item allows quick removal.
 
 ### New Features in This Fork:
+- **GTK-independent RecentManager:** Enhanced version of BlankParticle's RecentManager.
 - **Private Mode:** A mode to ensure that no new items are saved to the Recent Manager while active.
 - **Blacklist Support:** Block specific MIME types and remove corresponding entries from `Gtk.RecentManager` automatically.
 - **Installation via `make install`:** Simplifies installation by automating schema compilation and setup.
@@ -16,7 +17,9 @@ This fork enhances the original RecentItems GNOME extension with the following f
 - **Translations for Multiple Languages:** 
   - Supported languages include:
     - `ar`, `ca`, `cs`, `de`, `el`, `es`, `eu`, `fa`, `fi`, `fr`, `hu`, `it`, `ja`, `nl`, `oc`, `pl`, `pt_BR`, `ru`, `sk`, `tr`, `uk`, `zh_CN`
-- **Pagination with `<` and `>` Instead of "More":** Navigate recent items using previous/next buttons for a more intuitive experience.
+- **Better Pagination:** Enhanced scrolling and navigation logic for smoother page transitions.
+- **Visualize removed files:** Visualize removed files in the recent items list.
+
 
 ## Installation Instructions
 
@@ -48,7 +51,7 @@ If you prefer to install from the source code, follow these steps:
 
 1. Clone or download the repository:
    ```bash
-   git clone https://github.com/bananenfisch/RecentItems.git
+   git clone https://github.com/lgoio/RecentItems.git
    cd RecentItems
    make install
 
@@ -76,7 +79,6 @@ So until there is no better solution, i will maintain this extension, but cannot
 
 ## TODOS:
 
-- Do not list deleted files
 - shortcut, like \<super\>+r
 - hide button after cleaning
 - option to pin files on top?
