@@ -38,26 +38,19 @@ export default class RecentManager extends Signals.EventEmitter {
       try {
 
         const file = Gio.File.new_for_uri(uri);
-        let mime_type;
-        let displayName;
-        const fileExsist = file.query_exists(null);
-        let visited;
-        let modified;
-        if(fileExsist) {
+        const fileExist = file.query_exists(null);
+          // The file doesn't exist, fallback to bookmarkFile informations
+        let displayName = this._bookmarkFile.get_title(uri);
+        let mime_type = this._bookmarkFile.get_mime_type(uri);
+        let visited = this._bookmarkFile.get_visited(uri);
+        let modified= this._bookmarkFile.get_modified(uri);
+        if(fileExist) {
           const info = file.query_info("standard::*,time::modified,time::access", Gio.FileQueryInfoFlags.NONE, null);
-          mime_type = info.get_content_type();
-          visited = Math.max(info.get_attribute_uint64("time::modified"), this._bookmarkFile.get_visited(uri));
-          modified = info.get_attribute_uint64("time::access"),
-          displayName = this._bookmarkFile.get_title(uri);
+          visited = Math.max(info.get_attribute_uint64("time::access"), visited);
+          modified = Math.max(info.get_attribute_uint64("time::modified"), modified);
           if (displayName == null) {
             displayName = info.get_display_name();
           }
-        } else {
-          // The file doesn't exist, fallback to bookmarkFile informations
-          displayName = this._bookmarkFile.get_title(uri);
-          mime_type = this._bookmarkFile.get_mime_type(uri);
-          visited = this._bookmarkFile.get_visited(uri);
-          modified= this._bookmarkFile.get_modified(uri);
         }
         if (displayName == null) {
           // Fallback: Extract the filename from the URI if no title is available
@@ -68,7 +61,7 @@ export default class RecentManager extends Signals.EventEmitter {
         }
         return {
           uri,
-          exist: fileExsist,
+          exist: fileExist,
           displayName,
           visited,
           modified,
