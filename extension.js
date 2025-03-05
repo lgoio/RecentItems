@@ -18,31 +18,86 @@ import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import { Extension, gettext as _ } from 'resource:///org/gnome/shell/extensions/extension.js';
 import RecentManager from "./recentManager.js";
+const ByteArray = imports.byteArray;
+
+
+const FallbackMirrorMapping = {
+  '(': ')',
+  ')': '(',
+  '[': ']',
+  ']': '[',
+  '{': '}',
+  '}': '{',
+  '<': '>',
+  '>': '<',
+  '«': '»',
+  '»': '«'
+};
+let mirrorMapping = FallbackMirrorMapping;
 
 
 
-export default class RecentItemsExtension extends Extension {
-  constructor(metadata) {
-    super(metadata);
+async function loadFile(filePath) {
+  let file = Gio.File.new_for_path(filePath);
+  // Wrap the asynchronous load in a promise
+  let [success, contents] = await new Promise((resolve, reject) => {
+    file.load_contents_async(null, (file, res) => {
+      try {
+        let [success, contents] = file.load_contents_finish(res);
+        resolve([success, contents]);
+      } catch (e) {
+        reject(e);
+      }
+    });
+  });
+  return [success, contents];
+}
+
+function parseBidiMirroring(fileContent) {
+  const mapping = {};
+  // Split the content into lines
+  const lines = fileContent.split(/\r?\n/);
+  for (const line of lines) {
+    // Remove comments and trim whitespace
+    const commentIndex = line.indexOf('#');
+    const lineWithoutComment = commentIndex >= 0 ? line.slice(0, commentIndex) : line;
+    const trimmed = lineWithoutComment.trim();
+    if (!trimmed) continue; // Skip empty lines
+
+    // Each valid line should be in the format: <srcHex>; <destHex>
+    const parts = trimmed.split(';');
+    if (parts.length < 2) continue;
+    
+    const srcHex = parts[0].trim();
+    const destHex = parts[1].trim();
+
+    // Convert hex to actual characters
+    const srcChar = String.fromCodePoint(parseInt(srcHex, 16));
+    const destChar = String.fromCodePoint(parseInt(destHex, 16));
+    
+    mapping[srcChar] = destChar;
+    // If needed, you can also store the reverse mapping:
+    mapping[destChar] = srcChar;
   }
+  return mapping;
+}
 
-  enable() {
-    this._settings = this.getSettings();
-    this.rec = new RecentItems(this);
+async function loadMirrorMapping(filePath) {
+		try {
+			let [success, contents] = await loadFile(filePath);
+			mirrorMapping = parseBidiMirroring(ByteArray.toString(contents));
+		} catch (e) {
+			mirrorMapping = FallbackMirrorMapping;
+		}
+}
 
-
-    // Add custom stylesheet
-    const themeContext = St.ThemeContext.get_for_stage(global.stage);
-    const cssFile = `${this.dir.get_path()}/stylesheet.css`;
-    const file = Gio.File.new_for_path(cssFile);
-    themeContext.get_theme().load_stylesheet(file);
+function replaceMirroredChars(text) {
+  let result = "";
+  for (const char of text) {
+    // If the character exists in the mapping, replace it; otherwise, keep the original.
+    result += mirrorMapping[char] || char;
   }
-
-  disable() {
-    this.rec.destroy();
-    this.rec = null;
-    this._settings = null;
-  }
+  return result;
 }
 
 const PopupMenuItem = GObject.registerClass(
@@ -64,6 +119,31 @@ const PopupMenuItem = GObject.registerClass(
     }
   },
 );
+
+export default class RecentItemsExtension extends Extension {
+  constructor(metadata) {
+    super(metadata);
+  }
+
+  enable() {
+    this._settings = this.getSettings();
+		loadMirrorMapping(`${this.dir.get_path()}/BidiMirroring.txt`);
+    this.rec = new RecentItems(this);
+
+
+    // Add custom stylesheet
+    const themeContext = St.ThemeContext.get_for_stage(global.stage);
+    const cssFile = `${this.dir.get_path()}/stylesheet.css`;
+    const file = Gio.File.new_for_path(cssFile);
+    themeContext.get_theme().load_stylesheet(file);
+  }
+
+  disable() {
+    this.rec.destroy();
+    this.rec = null;
+    this._settings = null;
+  }
+}
 
 const RecentItems = GObject.registerClass(
   class RecentItems extends PanelMenu.Button {
@@ -315,7 +395,7 @@ const RecentItems = GObject.registerClass(
       
       // Add a label
       const pathLabel = new St.Label({
-        text: "\u202E" + path.split("").reverse().join(""), // ellipsis at the beginning of a left-to-right text
+        text: "\u202E" + replaceMirroredChars(path.split("").reverse().join("")), // ellipsis at the beginning of a left-to-right text
         style_class: 'item-path',
         x_expand: true,
         x_align: Clutter.ActorAlign.END,

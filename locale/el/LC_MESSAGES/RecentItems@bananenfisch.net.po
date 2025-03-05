@@ -1,22 +1,22 @@
 msgid ""
 msgstr ""
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-03-05 20:16+0100\n"
+"POT-Creation-Date: 2025-03-05 21:35+0100\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 
-#: extension.js:184
+#: extension.js:264
 msgid "Private mode"
 msgstr "Ιδιωτική λειτουργία"
 
-#: extension.js:394
+#: extension.js:480
 msgid "%x of %y"
 msgstr "%x από %y"
 
-#: extension.js:410
+#: extension.js:496
 msgid "No items found"
 msgstr ""
 
-#: extension.js:443
+#: extension.js:529
 msgid "Search..."
 msgstr "Αναζήτηση..."
 
