@@ -233,9 +233,15 @@ const RecentItems = GObject.registerClass(
         }
       });
 
-      this.changeHandler = this.recentManager.connect('changed', () => { this._recentManagerChanged=true;});
+      this.changeHandler = this.recentManager.connect('changed', () => {
+        this._recentManagerChanged=true;
+        if(this.menu.isOpen){
+          this._sync();
+        }
+      });
       this.settingsChangeHandler = this._extension._settings.connect('changed', () => {
-        this._setMenuWidth(); this._sync();
+        this._setMenuWidth();
+        this._sync();
       });
 
       // Scroll-Drosselung
