@@ -1,4 +1,5 @@
 # RecentItems (Enhanced Fork)
+![RecentItems Enhanced Fork](RecentItems.png)
 
 ## About This Fork
 
@@ -55,20 +56,14 @@ If you prefer to install from the source code, follow these steps:
    cd RecentItems
    make install
 
-## Important: this extension is not being updated on extensions.gnome.org for now
+## Important: This extension is not updated on extensions.gnome.org for now
 
 ### Why?
-The latest "GNOME Shell Extensions Review Guidelines" [https://gjs.guide/extensions/review-guidelines/review-guidelines.html#do-not-import-gtk-libraries-in-gnome-shell]:
-"Do not import GTK libraries"
 
-This extension uses the GTK.RecentManager to have access to the recent files. This works fine, but by importing GTK.RecentManager it's not compatible with the guidelines for extensions.gnome.org.
-
-The previous solution (implement a custom RecentManger) would work, but there are many cons:
-1. it violates the KISS principle - there is already a RecentManger implemented (in GTK)
-2. it's more buggy, because every time gnome changes something on the RecentManager, it could break
-3. it's bad memory management: the GTK.RecentManager already holds all items in the memory, it's ugly to read out the whole recent-items file and hold all items again
-
-So until there is no better solution, i will maintain this extension, but cannot upload to gnome.
+The original extension uses GTK.RecentManager to access recent files.
+In contrast, the fork does not use GTK.RecentManager.
+There is an open merge request addressing this change.
+Until that merge request is resolved, the extension will not be available on extensions.gnome.org.
 
 ## Recent Items - an extension for gnome-shell
 
