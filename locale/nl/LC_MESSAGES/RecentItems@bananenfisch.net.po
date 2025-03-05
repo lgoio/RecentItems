@@ -1,22 +1,22 @@
 msgid ""
 msgstr ""
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-03-05 23:13+0100\n"
+"POT-Creation-Date: 2025-03-06 00:06+0100\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 
 #: extension.js:243
 msgid "Private mode"
 msgstr "Privémodus"
 
-#: extension.js:475
+#: extension.js:482
 msgid "%x of %y"
 msgstr "%x van %y"
 
-#: extension.js:491
+#: extension.js:498
 msgid "No items found"
 msgstr ""
 
-#: extension.js:527
+#: extension.js:534
 msgid "Search..."
 msgstr "Zoeken..."
 

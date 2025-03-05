@@ -257,6 +257,13 @@ const RecentItems = GObject.registerClass(
           this._iconActor.opacity = 255; // Restore full opacity when private mode is inactive
         }
       });
+    
+      // Adjust icon opacity based on private mode state
+      if (this.privateModeMenuItem.state) {
+        this._iconActor.opacity = 100; // Dim the icon when private mode is active
+      } else {
+        this._iconActor.opacity = 255; // Restore full opacity when private mode is inactive
+      }
       actionsBox.add_child(this.privateModeMenuItem);
 
       // Add "Clear All" button
