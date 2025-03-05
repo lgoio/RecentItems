@@ -1,28 +1,22 @@
 /* stylesheet.css */
 
-.item-deleted {
+.item-deleted, .item-path-deleted {
     opacity: 0.5; /* Make the item semi-transparent */
     text-decoration: line-through; /* Strike-through text */
     color: gray; /* Dim color for deleted items */
 }
 
-.item-deleted:hover {
+.item-deleted:hover, .item-path-deleted {
     opacity: 0.8; /* Slightly highlight when hovered */
 }
-.search-entry {
-    max-width: 100%;
-    width: 100%; /* Ensure it matches the parent container's width */
-}
-  
-.number-entry {
-    max-width: 100%;
-    width: 100%; /* Similarly limit number entry width */
+
+.item-path, .item-path-deleted {
+    padding: 0 6px;
+    font-size: 65%;
+    text-align: right;
+    
 }
 
 .popup-menu-section {
     padding: 0 10px; /* Add padding for better alignment */
-}
-
-.item-box {
-    max-width: 100%; /* Prevent overflowing content */
 }

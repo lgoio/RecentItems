@@ -290,7 +290,7 @@ const RecentItems = GObject.registerClass(
         vertical: false,
         x_expand: true,
       });
-
+      
       // Add an icon
       const icon = new St.Icon({ gicon, style_class: 'popup-menu-icon' });
       menuBox.add_child(icon);
@@ -301,11 +301,28 @@ const RecentItems = GObject.registerClass(
         x_expand: true,
         x_align: Clutter.ActorAlign.START,
       });
+
+      let path = decodeURI(item.uri)
+      .replace("file://", "")
+      .replace(GLib.get_home_dir(), "~")
+      .replace(/\/[^\/]*$/, "/");
+      
+      // Add a label
+      const pathLabel = new St.Label({
+        text: "\u202E" + path.split("").reverse().join(""), // ellipsis at the beginning of a left-to-right text
+        style_class: 'item-path',
+        x_expand: true,
+        x_align: Clutter.ActorAlign.END,
+        y_align: Clutter.ActorAlign.END,
+      });
+
       if (!item.exist)
+      {
         label.set_style_class_name("item-deleted");
-
-
+        pathLabel.set_style_class_name("item-path-deleted");
+      }
       menuBox.add_child(label);
+      menuBox.add_child(pathLabel);
 
       // Add a "Delete" button
       const deleteButton = new St.Button({
