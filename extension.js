@@ -420,88 +420,82 @@ const RecentItems = GObject.registerClass(
     }
 
     async _sync() {
-      new Promise((resolve, reject) => {
-        if(!this.menu.isOpen || this._isSyncing)
-        {
-          resolve();
+      if(!this.menu.isOpen || this._isSyncing)
+      {
+        return;
+      }
+      this._isSyncing = true;
+      if(this._recentManagerChanged) {
+        this._recentManagerChanged = false;
+        if (!this.privateModeMenuItem.state) {
+          this._allItems = this.recentManager.get_items();
+        } else {
+          const tmpAllItems = this.recentManager.get_items();
+          for (const item of tmpAllItems) {
+            const uri = item.uri;
+
+            // Remove item if not in the current list
+            if (!this._allItems.some(existingItem => existingItem.uri === uri)) {
+              // console.log("Remove item in private mode: " + uri);
+              this.recentManager.remove_item(uri);
+              this._isSyncing = false;
+              return;
+            }
+          }
+          this._allItems = tmpAllItems;
+        }
+      }
+
+      const itemBlacklist = this._extension._settings.get_string('item-blacklist');
+      const blacklistList = itemBlacklist.replace(/\s/g, "").split(",");
+
+      for (const item of this._allItems) {
+        if (blacklistList.indexOf(item.mime_type.split("/")[0]) !== -1) {
+          const uri = item.uri;
+          // console.log("Remove blacklisted item: " + uri);
+          this.recentManager.remove_item(uri);
+          this._isSyncing = false;
           return;
         }
-        this._isSyncing = true;
-        if(this._recentManagerChanged) {
-          this._recentManagerChanged = false;
-          if (!this.privateModeMenuItem.state) {
-            this._allItems = this.recentManager.get_items();
-          } else {
-            const tmpAllItems = this.recentManager.get_items();
-            for (const item of tmpAllItems) {
-              const uri = item.uri;
+      }
+      const items = this.itemBox._getMenuItems();
+      for (const item of items) {
+        item.reactive = false;
+        if (item._deleteButton && item._deleteSignalId) {
+          item._deleteButton.disconnect(item._deleteSignalId);
+        }
+        if (item._activateSignalId) {
+          item.disconnect(item._activateSignalId);
+        }
+      }
+      this.itemBox.removeAll();
+      const filteredItems = this._filterItems(this._searchTerm, blacklistList);
+      const countItem = filteredItems.length;
 
-              // Remove item if not in the current list
-              if (!this._allItems.some(existingItem => existingItem.uri === uri)) {
-                // console.log("Remove item in private mode: " + uri);
-                this.recentManager.remove_item(uri);
-                this._isSyncing = false;
-                resolve();
-                return;
-              }
-            }
-            this._allItems = tmpAllItems;
-          }
+      if (countItem > 0) {
+        const showItemCount = this._extension._settings.get_int('item-count');
+        this._num_page = Math.ceil(countItem / showItemCount) - 1;
+        this.page_input.set_hint_text( _('%x of %y').replace('%x', this._page + 1).replace('%y', this._num_page + 1));
+        let modlist = [];
+        for (let i = 0; i < countItem; i++) {
+          modlist[i] = [Math.max(filteredItems[i].visited, filteredItems[i].modified), i];
         }
 
-        const itemBlacklist = this._extension._settings.get_string('item-blacklist');
-        const blacklistList = itemBlacklist.replace(/\s/g, "").split(",");
+        modlist.sort((x, y) => y[0] - x[0]);
 
-        for (const item of this._allItems) {
-          if (blacklistList.indexOf(item.mime_type.split("/")[0]) !== -1) {
-            const uri = item.uri;
-            // console.log("Remove blacklisted item: " + uri);
-            this.recentManager.remove_item(uri);
-            this._isSyncing = false;
-            resolve();
-            return;
-          }
+        const startID = this._page * showItemCount;
+        let id = startID;
+        while (id < showItemCount + startID && id < countItem) {
+          this._addRecentMenuItem(filteredItems[modlist[id][1]], this.itemBox);
+          id++;
         }
-        const items = this.itemBox._getMenuItems();
-        for (const item of items) {
-          item.reactive = false;
-          if (item._deleteButton && item._deleteSignalId) {
-            item._deleteButton.disconnect(item._deleteSignalId);
-          }
-          if (item._activateSignalId) {
-            item.disconnect(item._activateSignalId);
-          }
-        }
-        this.itemBox.removeAll();
-        const filteredItems = this._filterItems(this._searchTerm, blacklistList);
-        const countItem = filteredItems.length;
-
-        if (countItem > 0) {
-          const showItemCount = this._extension._settings.get_int('item-count');
-          this._num_page = Math.ceil(countItem / showItemCount) - 1;
-          this.page_input.set_hint_text( _('%x of %y').replace('%x', this._page + 1).replace('%y', this._num_page + 1));
-          let modlist = [];
-          for (let i = 0; i < countItem; i++) {
-            modlist[i] = [Math.max(filteredItems[i].visited, filteredItems[i].modified), i];
-          }
-
-          modlist.sort((x, y) => y[0] - x[0]);
-
-          const startID = this._page * showItemCount;
-          let id = startID;
-          while (id < showItemCount + startID && id < countItem) {
-            this._addRecentMenuItem(filteredItems[modlist[id][1]], this.itemBox);
-            id++;
-          }
-        } else {
-          const noResultsItem = new PopupMenu.PopupBaseMenuItem({ reactive: false });
-          const noResultsLabel = new St.Label({ text: _('No items found') });
-          noResultsItem.add_child(noResultsLabel);
-          this.itemBox.addMenuItem(noResultsItem);
-        }
-        this._isSyncing = false;
-        resolve();
-      });
+      } else {
+        const noResultsItem = new PopupMenu.PopupBaseMenuItem({ reactive: false });
+        const noResultsLabel = new St.Label({ text: _('No items found') });
+        noResultsItem.add_child(noResultsLabel);
+        this.itemBox.addMenuItem(noResultsItem);
+      }
+      this._isSyncing = false;
     }
 
     _navigatePrevPage() {
