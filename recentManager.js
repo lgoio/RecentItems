@@ -54,7 +54,7 @@ export default class RecentManager extends Signals.EventEmitter {
         }
         if (displayName == null) {
           // Fallback: Extract the filename from the URI if no title is available
-          displayName = uri.replace(/^.*\//, ""); // Removes everything before the last `/`
+          displayName = decodeURIComponent(uri).replace(/^.*\//, ""); // Removes everything before the last `/`
         }
         if (mime_type == null) {
           mime_type = "application/octet-stream";

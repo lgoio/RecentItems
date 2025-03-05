@@ -35,8 +35,6 @@ const FallbackMirrorMapping = {
 };
 let mirrorMapping = FallbackMirrorMapping;
 
-
-
 async function loadFile(filePath) {
   let file = Gio.File.new_for_path(filePath);
   // Wrap the asynchronous load in a promise
@@ -100,25 +98,6 @@ function replaceMirroredChars(text) {
   return result;
 }
 
-const PopupMenuItem = GObject.registerClass(
-  class PopupMenuItem extends PopupMenu.PopupBaseMenuItem {
-    constructor(gicon, text, params) {
-      super(params);
-
-      this.box = new St.BoxLayout({ style_class: 'popup-combobox-item' });
-
-      if (gicon)
-        this.icon = new St.Icon({ gicon, style_class: 'popup-menu-icon' });
-      else
-        this.icon = new St.Icon({ icon_name: 'edit-clear-symbolic', icon_size: 22 });
-
-      this.box.add_child(this.icon);
-      this.label = new St.Label({ text: ' ' + text });
-      this.box.add_child(this.label);
-      this.add_child(this.box);
-    }
-  },
-);
 
 export default class RecentItemsExtension extends Extension {
   constructor(metadata) {
@@ -388,14 +367,14 @@ const RecentItems = GObject.registerClass(
         x_align: Clutter.ActorAlign.START,
       });
 
-      let path = decodeURI(item.uri)
+      let path = replaceMirroredChars(decodeURIComponent(item.uri)
       .replace("file://", "")
       .replace(GLib.get_home_dir(), "~")
-      .replace(/\/[^\/]*$/, "/");
+      .replace(/\/[^\/]*$/, "/"));
       
       // Add a label
       const pathLabel = new St.Label({
-        text: "\u202E" + replaceMirroredChars(path.split("").reverse().join("")), // ellipsis at the beginning of a left-to-right text
+        text: "\u202E" + path.split("").reverse().join(""), // ellipsis at the beginning of a left-to-right text
         style_class: 'item-path',
         x_expand: true,
         x_align: Clutter.ActorAlign.END,
@@ -420,83 +399,102 @@ const RecentItems = GObject.registerClass(
         x_align: Clutter.ActorAlign.END,
       });
 
-      deleteButton.connect('clicked', () => this._deleteItem(uri));
       menuBox.add_child(deleteButton);
 
       // Make the entire item clickable
       const menuItem = new PopupMenu.PopupBaseMenuItem();
       menuItem.add_child(menuBox);
+      menuItem._deleteButton=deleteButton;
+      menuItem._deleteSignalId=deleteButton.connect('clicked', () => this._deleteItem(uri));
       menuItem._activateSignalId = menuItem.connect('activate', (_, ev) => {
         this._launchFile(uri, ev);
       });
       itemContainer.addMenuItem(menuItem);
     }
 
-    _sync() {
-      const items = this.itemBox._getMenuItems();
-      for (const item of items) {
-        if (item._activateSignalId) {
-          item.disconnect(item._activateSignalId);
-        }
-      }
-      this.itemBox.removeAll();
-      if(this._recentManagerChanged) {
-        this._recentManagerChanged = false;
-        if (!this.privateModeMenuItem.state) {
-          this._allItems = this.recentManager.get_items();
-        } else {
-          const tmpAllItems = this.recentManager.get_items();
-          for (const item of tmpAllItems) {
-            const uri = item.uri;
-
-            // Remove item if not in the current list
-            if (!this._allItems.some(existingItem => existingItem.uri === uri)) {
-              // console.log("Remove item in private mode: " + uri);
-              this.recentManager.remove_item(uri);
-              return;
-            }
-          }
-          this._allItems = tmpAllItems;
-        }
-      }
-      const itemBlacklist = this._extension._settings.get_string('item-blacklist');
-      const blacklistList = itemBlacklist.replace(/\s/g, "").split(",");
-
-      for (const item of this._allItems) {
-        if (blacklistList.indexOf(item.mime_type.split("/")[0]) !== -1) {
-          const uri = item.uri;
-          // console.log("Remove blacklisted item: " + uri);
-          this.recentManager.remove_item(uri);
+    async _sync() {
+      new Promise((resolve, reject) => {
+        if(!this.menu.isOpen || this._isSyncing)
+        {
+          resolve();
           return;
         }
-      }
+        this._isSyncing = true;
+        if(this._recentManagerChanged) {
+          this._recentManagerChanged = false;
+          if (!this.privateModeMenuItem.state) {
+            this._allItems = this.recentManager.get_items();
+          } else {
+            const tmpAllItems = this.recentManager.get_items();
+            for (const item of tmpAllItems) {
+              const uri = item.uri;
 
-      const filteredItems = this._filterItems(this._searchTerm, blacklistList);
-      const countItem = filteredItems.length;
-
-      if (countItem > 0) {
-        const showItemCount = this._extension._settings.get_int('item-count');
-        this._num_page = Math.ceil(countItem / showItemCount) - 1;
-        this.page_input.set_hint_text( _('%x of %y').replace('%x', this._page + 1).replace('%y', this._num_page + 1));
-        let modlist = [];
-        for (let i = 0; i < countItem; i++) {
-          modlist[i] = [Math.max(filteredItems[i].visited, filteredItems[i].modified), i];
+              // Remove item if not in the current list
+              if (!this._allItems.some(existingItem => existingItem.uri === uri)) {
+                // console.log("Remove item in private mode: " + uri);
+                this.recentManager.remove_item(uri);
+                resolve();
+                this._isSyncing = false;
+                return;
+              }
+            }
+            this._allItems = tmpAllItems;
+          }
         }
 
-        modlist.sort((x, y) => y[0] - x[0]);
+        const itemBlacklist = this._extension._settings.get_string('item-blacklist');
+        const blacklistList = itemBlacklist.replace(/\s/g, "").split(",");
 
-        const startID = this._page * showItemCount;
-        let id = startID;
-        while (id < showItemCount + startID && id < countItem) {
-          this._addRecentMenuItem(filteredItems[modlist[id][1]], this.itemBox);
-          id++;
+        for (const item of this._allItems) {
+          if (blacklistList.indexOf(item.mime_type.split("/")[0]) !== -1) {
+            const uri = item.uri;
+            // console.log("Remove blacklisted item: " + uri);
+            this.recentManager.remove_item(uri);
+            resolve();
+            this._isSyncing = false;
+            return;
+          }
         }
-      } else {
-        const noResultsItem = new PopupMenu.PopupBaseMenuItem({ reactive: false });
-        const noResultsLabel = new St.Label({ text: _('No items found') });
-        noResultsItem.add_child(noResultsLabel);
-        this.itemBox.addMenuItem(noResultsItem);
-      }
+        const items = this.itemBox._getMenuItems();
+        for (const item of items) {
+          item.reactive = false;
+          if (item._deleteButton && item._deleteSignalId) {
+            item._deleteButton.disconnect(item._deleteSignalId);
+          }
+          if (item._activateSignalId) {
+            item.disconnect(item._activateSignalId);
+          }
+        }
+        this.itemBox.removeAll();
+        const filteredItems = this._filterItems(this._searchTerm, blacklistList);
+        const countItem = filteredItems.length;
+
+        if (countItem > 0) {
+          const showItemCount = this._extension._settings.get_int('item-count');
+          this._num_page = Math.ceil(countItem / showItemCount) - 1;
+          this.page_input.set_hint_text( _('%x of %y').replace('%x', this._page + 1).replace('%y', this._num_page + 1));
+          let modlist = [];
+          for (let i = 0; i < countItem; i++) {
+            modlist[i] = [Math.max(filteredItems[i].visited, filteredItems[i].modified), i];
+          }
+
+          modlist.sort((x, y) => y[0] - x[0]);
+
+          const startID = this._page * showItemCount;
+          let id = startID;
+          while (id < showItemCount + startID && id < countItem) {
+            this._addRecentMenuItem(filteredItems[modlist[id][1]], this.itemBox);
+            id++;
+          }
+        } else {
+          const noResultsItem = new PopupMenu.PopupBaseMenuItem({ reactive: false });
+          const noResultsLabel = new St.Label({ text: _('No items found') });
+          noResultsItem.add_child(noResultsLabel);
+          this.itemBox.addMenuItem(noResultsItem);
+        }
+        this._isSyncing = false;
+        resolve();
+      });
     }
 
     _navigatePrevPage() {
@@ -565,29 +563,34 @@ const RecentItems = GObject.registerClass(
     }
 
     _onScroll(event) {
-      // Wenn das Scrollen gerade blockiert ist, ignorieren
+      // If scrolling is throttled, ignore the event
       if (this._scrollThrottle) return;
-
+        
       const direction = event.get_scroll_direction();
-  
-      if (direction === Clutter.ScrollDirection.UP) {
-        this._navigatePrevPage();
-      } else if (direction === Clutter.ScrollDirection.DOWN) {
-        this._navigateNextPage();
-      } else {
+    
+      try {
+        if (direction === Clutter.ScrollDirection.UP) {
+          this._navigatePrevPage();
+        } else if (direction === Clutter.ScrollDirection.DOWN) {
+          this._navigateNextPage();
+        } else {
+          return;
+        }
+      } catch (e) {
+        logError(e);
         return;
       }
-  
-      // Scroll-Drosselung aktivieren
+
+      // Activate scroll throttle
       this._scrollThrottle = true;
-  
-      // Drosselung nach 300 ms zurücksetzen
-      this._scrollThrottleTimeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 300, () => {
+      // Reset throttle after 100 ms
+      this._scrollThrottleTimeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 100, () => {
+        this._scrollThrottleTimeoutId = false;
         this._scrollThrottle = false;
-        return GLib.SOURCE_REMOVE; // Timeout nur einmal ausführen
+        return GLib.SOURCE_REMOVE; // Run timeout only once
       });
     }
-  
+    
     _deleteItem(uri) {
       this.recentManager.remove_item(uri);
     }
