@@ -337,25 +337,25 @@ const RecentItems = GObject.registerClass(
         }
       }
       this.itemBox.removeAll();
-			if(this._recentManagerChanged) {
-				this._recentManagerChanged = false;
-		    if (!this.privateModeMenuItem.state) {
-		      this._allItems = this.recentManager.get_items();
-		    } else {
-		      const tmpAllItems = this.recentManager.get_items();
-		      for (const item of tmpAllItems) {
-		        const uri = item.uri;
+      if(this._recentManagerChanged) {
+        this._recentManagerChanged = false;
+        if (!this.privateModeMenuItem.state) {
+          this._allItems = this.recentManager.get_items();
+        } else {
+          const tmpAllItems = this.recentManager.get_items();
+          for (const item of tmpAllItems) {
+            const uri = item.uri;
 
-		        // Remove item if not in the current list
-		        if (!this._allItems.some(existingItem => existingItem.uri === uri)) {
-		          // console.log("Remove item in private mode: " + uri);
-		          this.recentManager.remove_item(uri);
-		          return;
-		        }
-		      }
-		      this._allItems = tmpAllItems;
-		    }
-			}
+            // Remove item if not in the current list
+            if (!this._allItems.some(existingItem => existingItem.uri === uri)) {
+              // console.log("Remove item in private mode: " + uri);
+              this.recentManager.remove_item(uri);
+              return;
+            }
+          }
+          this._allItems = tmpAllItems;
+        }
+      }
       const itemBlacklist = this._extension._settings.get_string('item-blacklist');
       const blacklistList = itemBlacklist.replace(/\s/g, "").split(",");
 
