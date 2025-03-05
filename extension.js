@@ -440,8 +440,8 @@ const RecentItems = GObject.registerClass(
               if (!this._allItems.some(existingItem => existingItem.uri === uri)) {
                 // console.log("Remove item in private mode: " + uri);
                 this.recentManager.remove_item(uri);
-                resolve();
                 this._isSyncing = false;
+                resolve();
                 return;
               }
             }
@@ -457,8 +457,8 @@ const RecentItems = GObject.registerClass(
             const uri = item.uri;
             // console.log("Remove blacklisted item: " + uri);
             this.recentManager.remove_item(uri);
-            resolve();
             this._isSyncing = false;
+            resolve();
             return;
           }
         }
