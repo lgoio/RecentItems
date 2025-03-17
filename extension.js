@@ -1,4 +1,14 @@
 /*
+    ENHANCED RECENT ITEMS, an extension for the gnome-shell.
+    (c) 2024-2025 Lukas Gottschall; <https://lgo.io/> <https://github.com/lgoio/RecentItems>
+    Gnome Shell Extensions: <https://extensions.gnome.org/>
+
+    This extension is a fork of bananenfisch's RecentItems and was originally intended for integration into the original project.
+    However, due to time constraints, the maintainer was unable to thoroughly review the changes,
+    which is why he ultimately rejected them.
+    Therefore, at his request, this extension remains a hard fork.
+    @See https://github.com/bananenfisch/RecentItems/issues/31
+    
     RECENT ITEMS, an extension for the gnome-shell.
     (c) 2011-2024 Kurt Fleisch; <https://www.bananenfisch.net/> <https://github.com/bananenfisch/RecentItems>
     Gnome Shell Extensions: <https://extensions.gnome.org/>
@@ -18,85 +28,8 @@ import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import { Extension, gettext as _ } from 'resource:///org/gnome/shell/extensions/extension.js';
 import RecentManager from "./recentManager.js";
-const ByteArray = imports.byteArray;
-
-
-const FallbackMirrorMapping = {
-  '(': ')',
-  ')': '(',
-  '[': ']',
-  ']': '[',
-  '{': '}',
-  '}': '{',
-  '<': '>',
-  '>': '<',
-  '«': '»',
-  '»': '«'
-};
-let mirrorMapping = FallbackMirrorMapping;
-
-async function loadFile(filePath) {
-  let file = Gio.File.new_for_path(filePath);
-  // Wrap the asynchronous load in a promise
-  let [success, contents] = await new Promise((resolve, reject) => {
-    file.load_contents_async(null, (file, res) => {
-      try {
-        let [success, contents] = file.load_contents_finish(res);
-        resolve([success, contents]);
-      } catch (e) {
-        reject(e);
-      }
-    });
-  });
-  return [success, contents];
-}
-
-function parseBidiMirroring(fileContent) {
-  const mapping = {};
-  // Split the content into lines
-  const lines = fileContent.split(/\r?\n/);
-  for (const line of lines) {
-    // Remove comments and trim whitespace
-    const commentIndex = line.indexOf('#');
-    const lineWithoutComment = commentIndex >= 0 ? line.slice(0, commentIndex) : line;
-    const trimmed = lineWithoutComment.trim();
-    if (!trimmed) continue; // Skip empty lines
-
-    // Each valid line should be in the format: <srcHex>; <destHex>
-    const parts = trimmed.split(';');
-    if (parts.length < 2) continue;
-    
-    const srcHex = parts[0].trim();
-    const destHex = parts[1].trim();
-
-    // Convert hex to actual characters
-    const srcChar = String.fromCodePoint(parseInt(srcHex, 16));
-    const destChar = String.fromCodePoint(parseInt(destHex, 16));
-    
-    mapping[srcChar] = destChar;
-    // If needed, you can also store the reverse mapping:
-    mapping[destChar] = srcChar;
-  }
-  return mapping;
-}
-
-async function loadMirrorMapping(filePath) {
-		try {
-			let [success, contents] = await loadFile(filePath);
-			mirrorMapping = parseBidiMirroring(ByteArray.toString(contents));
-		} catch (e) {
-			mirrorMapping = FallbackMirrorMapping;
-		}
-}
-
-function replaceMirroredChars(text) {
-  let result = "";
-  for (const char of text) {
-    // If the character exists in the mapping, replace it; otherwise, keep the original.
-    result += mirrorMapping[char] || char;
-  }
-  return result;
-}
+import Mutex from "./mutex.js";
+import MirrorMapping from "./mirrorMapping.js";
 
 
 export default class RecentItemsExtension extends Extension {
@@ -106,10 +39,7 @@ export default class RecentItemsExtension extends Extension {
 
   enable() {
     this._settings = this.getSettings();
-		loadMirrorMapping(`${this.dir.get_path()}/BidiMirroring.txt`);
     this.rec = new RecentItems(this);
-
-
     // Add custom stylesheet
     const themeContext = St.ThemeContext.get_for_stage(global.stage);
     const cssFile = `${this.dir.get_path()}/stylesheet.css`;
@@ -130,6 +60,8 @@ const RecentItems = GObject.registerClass(
       super(0.0);
       this._extension = extension;
       this._setMenuWidth();
+      this.mirrorMapping = new MirrorMapping(`${extension.dir.get_path()}/BidiMirroring.txt`);
+
       this._iconActor = new St.Icon({
         icon_name: 'document-open-recent-symbolic',
         style_class: 'system-status-icon',
@@ -142,14 +74,15 @@ const RecentItems = GObject.registerClass(
       this.menu.addMenuItem(this.itemBox, 0);
 
       this.recentManager = new RecentManager();
-      this._allItems = this.recentManager.get_items(); // Store all items
+      this._allItems = null; // Store all items
       this._searchTerm = ''; // Initialize search term
       this._searchQuery = ''; // Initialize search query
       this._page = 0; // Pagination index
       this._num_page = 0; // Number of pages
-      this._isSyncing = false; // Mutex flag for syncing
-      this.cleanPrivateModeTimeoutID = null;
-			this._recentManagerChanged=true;
+      this._syncMutex = new Mutex();
+      this._syncInQueue = false;
+
+			this._recentManagerChanged = true;
       // Add navigation and action buttons
       const actionsSection = new PopupMenu.PopupMenuSection();
       const actionsBox = new St.BoxLayout({
@@ -190,7 +123,7 @@ const RecentItems = GObject.registerClass(
         can_focus: true,
         track_hover: true,
       });
-      this.page_input.get_clutter_text().connect('text-changed', () => {
+      this._pageInputTextChangedId = this.page_input.get_clutter_text().connect('text-changed', () => {
         const clutterText = this.page_input.get_clutter_text();
         const currentText = clutterText.get_text();
 
@@ -221,7 +154,7 @@ const RecentItems = GObject.registerClass(
       });
 
       // Handle the "Enter" key for immediate page change
-      this.page_input.get_clutter_text().connect('key-press-event', (_, event) => {
+      this._pageInputKeyPressId =  this.page_input.get_clutter_text().connect('key-press-event', (_, event) => {
         const symbol = event.get_key_symbol();
         if (symbol === Clutter.KEY_Return || symbol === Clutter.KEY_KP_Enter) {
           const pageNumber = parseInt(this.page_input.get_text(), 10) - 1;
@@ -244,18 +177,8 @@ const RecentItems = GObject.registerClass(
         this._extension._settings.get_boolean("private-mode"),
         { reactive: true },
       );
-      this.privateModeMenuItem.connect('toggled', () => {
-        this._allItems = this.recentManager.get_items();
-        this._extension._settings.set_boolean(
-          "private-mode",
-          this.privateModeMenuItem.state,
-        );
-        // Adjust icon opacity based on private mode state
-        if (this.privateModeMenuItem.state) {
-          this._iconActor.opacity = 100; // Dim the icon when private mode is active
-        } else {
-          this._iconActor.opacity = 255; // Restore full opacity when private mode is inactive
-        }
+      this._privateModeToggleId = this.privateModeMenuItem.connect('toggled', () => {
+        this.togglePrivateMode();
       });
     
       // Adjust icon opacity based on private mode state
@@ -263,25 +186,36 @@ const RecentItems = GObject.registerClass(
         this._iconActor.opacity = 100; // Dim the icon when private mode is active
       } else {
         this._iconActor.opacity = 255; // Restore full opacity when private mode is inactive
+        this._connectChangeHandler();
       }
       actionsBox.add_child(this.privateModeMenuItem);
 
       // Add "Clear All" button
-      const clearMenuItem = new PopupMenu.PopupBaseMenuItem();
-      clearMenuItem.add_child(
+      this.clearMenuItem = new PopupMenu.PopupBaseMenuItem();
+      this.clearMenuItem.add_child(
         new St.Icon({
           icon_name: 'edit-delete-symbolic',
           style_class: 'popup-menu-icon',
         }),
       );
-      actionsBox.add_child(clearMenuItem);
-      clearMenuItem.connect('activate', this._clearAll.bind(this));
+      actionsBox.add_child(this.clearMenuItem);
+      this._clearMenuId = this.clearMenuItem.connect('activate', this._clearAll.bind(this));
 
+      this.settingsMenuItem = new PopupMenu.PopupBaseMenuItem();
+      this.settingsMenuItem.add_child(
+        new St.Icon({
+          icon_name: 'emblem-system-symbolic',
+          style_class: 'popup-menu-icon',
+        }),
+      );
+      this._settingsMenuId = this.settingsMenuItem.connect('activate', this._openSettings.bind(this));
+      actionsBox.add_child(this.settingsMenuItem);
+  
       this._sync();
       this.menu.addMenuItem(actionsSection);
       this._addSearchField();
 
-      this.menu.connect('open-state-changed', (self, open) => {
+      this.openStateChangeHandler = this.menu.connect('open-state-changed', (self, open) => {
         if (open) {
           this._setMenuWidth();
           this._page = 0; // Set the page to 0 when the menu opens
@@ -295,13 +229,6 @@ const RecentItems = GObject.registerClass(
               return false;
             },
           );
-          this._sync();
-        }
-      });
-
-      this.changeHandler = this.recentManager.connect('changed', () => {
-        this._recentManagerChanged=true;
-        if(this.menu.isOpen){
           this._sync();
         }
       });
@@ -319,15 +246,28 @@ const RecentItems = GObject.registerClass(
         return Clutter.EVENT_STOP; // Konsumiere das Event
       });
       Main.panel.addToStatusArea(this._extension.uuid, this);
-
     }
 
+    _openSettings() {
+      this._extension.openPreferences();
+      this.menu.close();
+    }
+
+
+    _connectChangeHandler() {
+      this.changeHandler = this.recentManager.connect('changed', () => {
+        this._recentManagerChanged=true;
+        if(this.menu.isOpen){
+          this._sync();
+        }
+      });
+    }
     _setMenuWidth() {
       const display = global.display;
       const screenWidth = display.get_monitor_geometry(
         display.get_primary_monitor()
       ).width;
-    
+      
       this.window_width_percentage = this._extension._settings.get_int("window-width-percentage");
       const menuWidth = Math.round(screenWidth * (this.window_width_percentage / 100));
       
@@ -374,7 +314,7 @@ const RecentItems = GObject.registerClass(
         x_align: Clutter.ActorAlign.START,
       });
 
-      let path = replaceMirroredChars(decodeURIComponent(item.uri)
+      let path = this.mirrorMapping.replaceChars(decodeURIComponent(item.uri)
       .replace("file://", "")
       .replace(GLib.get_home_dir(), "~")
       .replace(/\/[^\/]*$/, "/"));
@@ -420,56 +360,154 @@ const RecentItems = GObject.registerClass(
     }
 
     async _sync() {
-      if(!this.menu.isOpen || this._isSyncing)
+      if(!this.menu.isOpen || this._syncInQueue)
       {
         return;
       }
-      this._isSyncing = true;
-      if(this._recentManagerChanged) {
-        this._recentManagerChanged = false;
-        if (!this.privateModeMenuItem.state) {
-          this._allItems = this.recentManager.get_items();
-        } else {
-          const tmpAllItems = this.recentManager.get_items();
-          for (const item of tmpAllItems) {
-            const uri = item.uri;
-
-            // Remove item if not in the current list
-            if (!this._allItems.some(existingItem => existingItem.uri === uri)) {
-              // console.log("Remove item in private mode: " + uri);
-              this.recentManager.remove_item(uri);
-              this._isSyncing = false;
-              return;
-            }
-          }
-          this._allItems = tmpAllItems;
-        }
+      if(this._syncMutex.isLocked())
+      {
+        this._syncInQueue = true;
       }
-
-      const itemBlacklist = this._extension._settings.get_string('item-blacklist');
-      const blacklistList = itemBlacklist.replace(/\s/g, "").split(",");
-
-      for (const item of this._allItems) {
-        if (blacklistList.indexOf(item.mime_type.split("/")[0]) !== -1) {
-          const uri = item.uri;
-          // console.log("Remove blacklisted item: " + uri);
-          this.recentManager.remove_item(uri);
-          this._isSyncing = false;
+      // Wait for the lock, and receive the unlock function.
+      let unlock = false;
+      try {
+        unlock = await this._syncMutex.lock();
+      } catch (e) {
+        console.error(e);
+        return;
+      }
+      this._syncInQueue = false;
+      try {
+        await this._do_sync();
+      } catch (e) {
+        console.error(e);
+      } finally {
+        // Make sure to release the lock.
+        unlock();
+      }
+    }
+    async togglePrivateMode() {
+      this._extension._settings.set_boolean(
+        "private-mode",
+        this.privateModeMenuItem.state,
+      );
+      if (this.privateModeMenuItem.state) {
+        // Adjust icon opacity to private mode
+        this._iconActor.opacity = 100; // Dim the icon when private mode is active
+        // Wait for the lock, and receive the unlock function.
+        let unlock = false;
+        try {
+          unlock = await this._syncMutex.lock();
+        } catch (e) {
+          console.error(e);
           return;
         }
-      }
-      const items = this.itemBox._getMenuItems();
-      for (const item of items) {
-        item.reactive = false;
-        if (item._deleteButton && item._deleteSignalId) {
-          item._deleteButton.disconnect(item._deleteSignalId);
+        try {
+          try {
+            await this.recentManager.backup();
+          } catch (e) {
+            console.error(e);
+          }
+          // Disconnect recent manager signal handler
+          if (this.changeHandler) {
+            this.recentManager.disconnect(this.changeHandler);
+            this.changeHandler = null;
+          }
+        } finally {
+          // Make sure to release the lock.
+          unlock();
         }
-        if (item._activateSignalId) {
-          item.disconnect(item._activateSignalId);
+      } else {
+        // Adjust icon opacity to not private mode
+        this._iconActor.opacity = 255; // Restore full opacity when private mode is inactive
+        // Wait for the lock, and receive the unlock function.
+        let unlock = false;
+        try {
+          unlock = await this._syncMutex.lock();
+        } catch (e) {
+          console.error(e);
+          return;
+        }
+        try {
+          try {
+            await this.recentManager.restore();
+          } catch (e) {
+            console.error(e);
+          }
+          this._connectChangeHandler();
+        } finally {
+          // Make sure to release the lock.
+          unlock();
         }
       }
+    }
+    async _do_sync() {
+        console.log("_do_sync");
+        let itemsRefreshed = false;
+        if (this._allItems == null) {
+          if(this.privateModeMenuItem.state)
+            await this.recentManager.restore();
+
+          console.log("init all items");
+
+          this._allItems = await this.recentManager.get_items();
+          this._recentManagerChanged = false;
+          itemsRefreshed = true;
+        }
+        else if(this._recentManagerChanged) {
+          this._recentManagerChanged = false;
+          if (!this.privateModeMenuItem.state) {
+            console.log("refresh all items");
+            this._allItems = await this.recentManager.get_items();
+            itemsRefreshed = true;
+          }
+        }
+
+        if (!this.privateModeMenuItem.state) {
+          if(itemsRefreshed) {
+            const itemBlacklist = this._extension._settings.get_string('item-blacklist');
+            const blacklistList = itemBlacklist.toLowerCase().replace(/\s/g, "").split(",");
+
+            for (const item of this._allItems) {
+              if (blacklistList.indexOf(item.mime_type.split("/")[0]) !== -1) {
+                const uri = item.uri;
+                await this.recentManager.remove_item(uri);
+                return;
+              }
+
+              if (blacklistList.indexOf("."+item.extension) !== -1) {
+                const uri = item.uri;
+                await this.recentManager.remove_item(uri);
+                return;
+              }
+            }
+            const items = this.itemBox._getMenuItems();
+            for (const item of items) {
+              item.reactive = false;
+              if (item._deleteButton && item._deleteSignalId) {
+                item._deleteButton.disconnect(item._deleteSignalId);
+              }
+              if (item._activateSignalId) {
+                item.disconnect(item._activateSignalId);
+              }
+            }
+          } else {
+            console.log("refresh modified and visited states");
+            for (const item of this._allItems) {
+              const file = Gio.File.new_for_uri(item.uri);
+              item.exist=file.query_exists(null);
+              if(item.exist) {
+                const info = file.query_info("time::modified,time::access", Gio.FileQueryInfoFlags.NONE, null);
+                item.visited = Math.max(info.get_attribute_uint64("time::access"), item.visited);
+                item.modified = Math.max(info.get_attribute_uint64("time::modified"), item.modified);
+              }
+            }
+          }
+      }
+
       this.itemBox.removeAll();
-      const filteredItems = this._filterItems(this._searchTerm, blacklistList);
+      const filteredItems = this._filterItems(this._searchTerm);
+      
       const countItem = filteredItems.length;
 
       if (countItem > 0) {
@@ -495,9 +533,7 @@ const RecentItems = GObject.registerClass(
         noResultsItem.add_child(noResultsLabel);
         this.itemBox.addMenuItem(noResultsItem);
       }
-      this._isSyncing = false;
     }
-
     _navigatePrevPage() {
       if (this._page > 0) {
         this._page -= 1;
@@ -547,11 +583,21 @@ const RecentItems = GObject.registerClass(
       this.menu.addMenuItem(searchMenuItem);
     }
 
-    _filterItems(searchTerm, blacklistList) {
+    _filterItems(searchTerm) {
+      const show_deleted_files = this._extension._settings.get_boolean("show-deleted-files")
       if (!searchTerm || searchTerm === "")
-        return this._allItems;
+      {
+        if(show_deleted_files){
+          return this._allItems;
+        }
+        return this._allItems.filter(item => item.exist);
+      }
 
-      return this._allItems.filter(item => item.displayName.toLowerCase().includes(searchTerm));
+      if(show_deleted_files){
+        return this._allItems.filter(item => item.displayName.toLowerCase().includes(searchTerm));
+      } else{
+        return this._allItems.filter(item => item.exist && item.displayName.toLowerCase().includes(searchTerm));
+      }
     }
 
     _launchFile(uri, ev) {
@@ -578,7 +624,7 @@ const RecentItems = GObject.registerClass(
           return;
         }
       } catch (e) {
-        logError(e);
+        console.error(e);
         return;
       }
 
@@ -592,16 +638,18 @@ const RecentItems = GObject.registerClass(
       });
     }
     
-    _deleteItem(uri) {
-      this.recentManager.remove_item(uri);
+    async _deleteItem(uri) {
+      await this.recentManager.remove_item(uri);
     }
 
-    _clearAll() {
-      this.recentManager.purge_items();
+    async _clearAll() {
+      await this.recentManager.purge_items();
       this._searchTerm = '';
       this._searchQuery = '';
     }
+
     destroy() {
+      
       const items = this.itemBox._getMenuItems();
       for (const item of items) {
         if (item._activateSignalId) {
@@ -613,6 +661,11 @@ const RecentItems = GObject.registerClass(
       if (this.settingsChangeHandler) {
         this._extension._settings.disconnect(this.settingsChangeHandler);
         this.settingsChangeHandler = null;
+      }
+      // Disconnect menu open state change handler
+      if (this.openStateChangeHandler) {
+        this.menu.disconnect(this.openStateChangeHandler);
+        this.openStateChangeHandler = null;
       }
     
       // Disconnect recent manager signal handler
@@ -626,7 +679,14 @@ const RecentItems = GObject.registerClass(
         this.recentManager.destroy();
         this.recentManager = null;
       }
-    
+      if(this.mirrorMapping)
+      {
+        this.mirrorMapping.destroy();
+        this.mirrorMapping = null;
+      }
+
+      this._syncMutex.destroy();
+
       // Remove scroll throttle timeout
       if (this._scrollThrottleTimeoutId) {
         GLib.Source.remove(this._scrollThrottleTimeoutId);
@@ -651,17 +711,17 @@ const RecentItems = GObject.registerClass(
         this._scrollEventId = null;
       }
     
-      // Disconnect specific signal handlers for prevPage and nextPage
+      // Disconnect signal handlers for prevPage and nextPage
       if (this._prevPageSignalId) {
         this.prevPage.disconnect(this._prevPageSignalId);
         this._prevPageSignalId = null;
       }
-    
+
       if (this._nextPageSignalId) {
         this.nextPage.disconnect(this._nextPageSignalId);
         this._nextPageSignalId = null;
       }
-    
+      
       // Disconnect page input text and key event handlers
       if (this.page_input && this.page_input.get_clutter_text()) {
         const clutterText = this.page_input.get_clutter_text();
@@ -680,7 +740,19 @@ const RecentItems = GObject.registerClass(
         this.privateModeMenuItem.disconnect(this._privateModeToggleId);
         this._privateModeToggleId = null;
       }
-    
+
+      // Disconnect clear menu
+      if (this._clearMenuId) {
+        this.clearMenuItem.disconnect(this._clearMenuId);
+        this._clearMenuId = null;
+      }
+      
+      // Disconnect settings menu
+      if (this._settingsMenuId) {
+        this.settingsMenuItem.disconnect(this._settingsMenuId);
+        this._settingsMenuId = null;
+      }
+
       // Call parent destroy method
       super.destroy();
     }

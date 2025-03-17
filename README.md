@@ -24,27 +24,25 @@ This fork enhances the original RecentItems GNOME extension with the following f
 
 ## Installation Instructions
 
-### Using `bundle.zip` (Recommended)
+### Using `BundleEnhancedRecentItems.zip` (Recommended)
 
-1. **Extract the Archive:**
-   - Extract the `bundle.zip` file into the following directory:
-     ```plaintext
-     ~/.local/share/gnome-shell/extensions/RecentItems@bananenfisch.net
-     ```
-   - Ensure the folder is named `RecentItems@bananenfisch.net`.
+1. **Install from BundleEnhancedRecentItems.zip:**
+   ```bash
+   # Download the `BundleEnhancedRecentItems.zip`
+   wget https://github.com/lgoio/RecentItems/releases/download/v31/BundleEnhancedRecentItems_v31.zip
+   # Extract the `BundleEnhancedRecentItems.zip` to ~/.local/share/gnome-shell/extensions/RecentItems@lgo.io
+   unzip -o BundleEnhancedRecentItems_v31.zip -d ~/.local/share/gnome-shell/extensions/RecentItems@lgo.io
+   # Compile schemas for the extension as following:
+   glib-compile-schemas ~/.local/share/gnome-shell/extensions/RecentItems@lgo.io/schemas
+   ```
 
-2. **Compile Schemas:**
-   - Run the following command to compile schemas for the extension:
-     ```bash
-     glib-compile-schemas ~/.local/share/gnome-shell/extensions/RecentItems@bananenfisch.net/schemas
-     ```
-
-3. **Restart GNOME Shell:**
+2. **Restart GNOME Shell:**
    - Press `Alt + F2`, type `r`, and press Enter.
    - Alternatively, log out and log back in.
+   - Alternatively, just reboot.
 
-4. **Enable the Extension:**
-   - Open GNOME Extensions or GNOME Tweaks and enable **Recent Items**.
+3. **Enable the Extension:**
+   - Open GNOME Extensions and enable **Enhanced Recent Items**.
 
 ## Manual Installation (Alternative)
 
@@ -56,14 +54,15 @@ If you prefer to install from the source code, follow these steps:
    cd RecentItems
    make install
 
-## Important: This extension is not updated on extensions.gnome.org for now
+## Important: This extension is not on extensions.gnome.org for now
 
 ### Why?
 
-The original extension uses GTK.RecentManager to access recent files.
-In contrast, the fork does not use GTK.RecentManager.
-There is an open merge request addressing this change.
-Until that merge request is resolved, the extension will not be available on extensions.gnome.org.
+This extension is a fork of bananenfisch's RecentItems and was originally intended for integration into the original project.
+However, due to time constraints, the maintainer was unable to thoroughly review the changes,
+which is why he ultimately rejected them.
+Therefore, at his request, this extension remains a hard fork.
+And because this extension is still fairly new, I want to fix all bugs before releasing it on extensions.gnome.org.
 
 ## Recent Items - an extension for gnome-shell
 
@@ -75,5 +74,4 @@ Until that merge request is resolved, the extension will not be available on ext
 ## TODOS:
 
 - shortcut, like \<super\>+r
-- hide button after cleaning
 - option to pin files on top?

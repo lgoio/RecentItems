@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schemalist>
-  <schema id="org.gnome.shell.extensions.recent-items" path="/org/gnome/shell/extensions/recent-items/">
+  <schema id="org.gnome.shell.extensions.enhanced-recent-items" path="/org/gnome/shell/extensions/enhanced-recent-items/">
     <key type="i" name="window-width-percentage">
       <default>33</default>
       <summary>Window width (%)</summary>
@@ -21,7 +21,14 @@
       <default>false</default>
       <summary>Enable private mode</summary>
       <description>
-        If true, copied items are not saved in the clipboard history (be that in memory or on disk).
+        If true, clipboard history is unchanged.
+      </description>
+    </key>
+    <key name="show-deleted-files" type="b">
+      <default>false</default>
+      <summary>Show deleted files</summary>
+      <description>
+        If true, deleted items are not removed in the clipboard history.
       </description>
     </key>
   </schema>
