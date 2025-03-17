@@ -29,9 +29,9 @@ This fork enhances the original RecentItems GNOME extension with the following f
 1. **Install from BundleEnhancedRecentItems.zip:**
    ```bash
    # Download the `BundleEnhancedRecentItems.zip`
-   wget https://github.com/lgoio/RecentItems/releases/download/v31/BundleEnhancedRecentItems_v31.zip
+   wget https://github.com/lgoio/RecentItems/releases/download/v32/BundleEnhancedRecentItems_v32.zip
    # Extract the `BundleEnhancedRecentItems.zip` to ~/.local/share/gnome-shell/extensions/RecentItems@lgo.io
-   unzip -o BundleEnhancedRecentItems_v31.zip -d ~/.local/share/gnome-shell/extensions/RecentItems@lgo.io
+   unzip -o BundleEnhancedRecentItems_v32.zip -d ~/.local/share/gnome-shell/extensions/RecentItems@lgo.io
    # Compile schemas for the extension as following:
    glib-compile-schemas ~/.local/share/gnome-shell/extensions/RecentItems@lgo.io/schemas
    ```

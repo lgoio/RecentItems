@@ -16,10 +16,16 @@ NO_JS_MODULES := $(filter-out %.js, $(MODULES))
 getMetaData = $(shell grep "\"$(1)\":" metadata.json | sed -E "s/[ ]*\"$(1)\":[ ]*(.*)$$/\1/" | sed -E "s/[,\"]*$$//" | sed -E "s/^[\"]*//")
 # getMetaData = $(shell grep "\"$(1)\"" metadata.json | sed -E "s/.*$(1)[^:]*: \"?([0-9A-Za-z]+)\"?.*/\1/")
 
-version:
-	@echo "$(NAME) - $(UUID) - $(VERSION) - $(SETTINGS_SCHEMA_FILE)"
 
-all: schemas/gschemas.compiled generate-translations compile-locales
+
+all: schemas/gschemas.compiled generate-translations compile-locales update-readme-versions
+
+version:
+	@echo "$(NAME) - $(UUID) - $(VERSION)"
+
+update-readme-versions:
+	sed -Ei "s/BundleEnhancedRecentItems_v[0-9]+.zip/BundleEnhancedRecentItems_v$(VERSION).zip/" README.md
+	sed -Ei "s@/v[0-9]+/@/v$(VERSION)/@" README.md
 
 compile-locales:
 	$(foreach file, $(wildcard locale/*/LC_MESSAGES/*.po), \
