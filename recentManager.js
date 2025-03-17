@@ -80,7 +80,7 @@ export default class RecentManager extends Signals.EventEmitter {
     if (this.fileExist(this._bookmarkFileInterimsBackupPath)) {
       console.warn("Load interims backup bookmark file.");
       // disconnect from file monitoring
-      this.disconnect();
+      this._disconnect();
       // Restore from temporary backup.
       await this.move(this._bookmarkFileInterimsBackup, this._bookmarkFileFile);
       // reconnect file monitoring
@@ -88,7 +88,7 @@ export default class RecentManager extends Signals.EventEmitter {
     } else if (this.fileExist(this._bookmarkFileBackupPath)) {
       console.warn("Load backup bookmark file.");
       // disconnect from file monitoring
-      this.disconnect();
+      this._disconnect();
       // Restore from the regular backup.
       await this.move(this._bookmarkFileBackup, this._bookmarkFileFile);
       // reconnect file monitoring
@@ -183,7 +183,7 @@ export default class RecentManager extends Signals.EventEmitter {
         return;
       }
       // disconnect from file monitoring
-      this.disconnect();
+      this._disconnect();
       try {
         // backup the bookmark file to a temporary to be able to restore the backup in case of failure
         if (this.fileExist(this._bookmarkFilePath)) {
@@ -220,6 +220,7 @@ export default class RecentManager extends Signals.EventEmitter {
     }
   }
   _get_items() {
+  	if (this._bookmarkFile === null) return {};
     return this._bookmarkFile.get_uris().map(uri => {
       try {
 
@@ -293,7 +294,7 @@ export default class RecentManager extends Signals.EventEmitter {
       return;
     }
     try {
-      this.disconnect();
+      this._disconnect();
       this._bookmarkFileFile.delete(null);
       this._bookmarkFile.to_file(this._bookmarkFilePath);
     } finally {
@@ -334,7 +335,7 @@ export default class RecentManager extends Signals.EventEmitter {
     return this._bookmarkFile !== null;
   }
 
-  disconnect() {
+  _disconnect() {
     if(this._fileMonitor !== null) {
       this._fileMonitor.disconnect(this._changedSignal);
       this._fileMonitor.cancel();
@@ -344,7 +345,6 @@ export default class RecentManager extends Signals.EventEmitter {
     }
     if(this._bookmarkFile !== null)
     {
-      this._bookmarkFile.free();
       this._bookmarkFile = null;
     } else {
       console.trace("Disconnect RecentManager without bookmarkFile");
@@ -358,7 +358,7 @@ export default class RecentManager extends Signals.EventEmitter {
   }
 
   destroy() {
-    this.disconnect();
+    this._disconnect();
     // unhandled promise rejections caused by mutex destroy are already ignored by extension.js RecentItems:destroy()
     this._bookmarkFileMutex.destroy();
   }

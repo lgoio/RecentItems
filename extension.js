@@ -178,7 +178,11 @@ const RecentItems = GObject.registerClass(
         { reactive: true },
       );
       this._privateModeToggleId = this.privateModeMenuItem.connect('toggled', () => {
-        this.togglePrivateMode();
+        try {
+          this.togglePrivateMode();
+        } catch (e) {
+          console.error(e);
+        }
       });
     
       // Adjust icon opacity based on private mode state
@@ -255,11 +259,9 @@ const RecentItems = GObject.registerClass(
 
 
     _connectChangeHandler() {
-      this.changeHandler = this.recentManager.connect('changed', () => {
+      this.changeHandler = this.recentManager.connect('changed', async() => {
         this._recentManagerChanged=true;
-        if(this.menu.isOpen){
-          this._sync();
-        }
+        this._sync();
       });
     }
     _setMenuWidth() {
@@ -504,7 +506,7 @@ const RecentItems = GObject.registerClass(
             }
           }
       }
-
+      
       this.itemBox.removeAll();
       const filteredItems = this._filterItems(this._searchTerm);
       
