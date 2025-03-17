@@ -483,16 +483,6 @@ const RecentItems = GObject.registerClass(
                 return;
               }
             }
-            const items = this.itemBox._getMenuItems();
-            for (const item of items) {
-              item.reactive = false;
-              if (item._deleteButton && item._deleteSignalId) {
-                item._deleteButton.disconnect(item._deleteSignalId);
-              }
-              if (item._activateSignalId) {
-                item.disconnect(item._activateSignalId);
-              }
-            }
           } else {
             console.log("refresh modified and visited states");
             for (const item of this._allItems) {
@@ -505,6 +495,17 @@ const RecentItems = GObject.registerClass(
               }
             }
           }
+      }
+
+      const items = this.itemBox._getMenuItems();
+      for (const item of items) {
+        item.reactive = false;
+        if (item._deleteButton && item._deleteSignalId) {
+          item._deleteButton.disconnect(item._deleteSignalId);
+        }
+        if (item._activateSignalId) {
+          item.disconnect(item._activateSignalId);
+        }
       }
       
       this.itemBox.removeAll();
