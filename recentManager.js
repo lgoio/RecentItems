@@ -66,7 +66,7 @@ export default class RecentManager extends Signals.EventEmitter {
         // Attempt to load the main bookmark file.
         this._bookmarkFile.load_from_file(this._bookmarkFilePath);
       } catch (e) {
-        console.error(e, `Not working bookmark file: ${this._bookmarkFilePath}`);
+        log(e, `Not working bookmark file: ${this._bookmarkFilePath}`);
         await this._recoverBookmarkFileBackup();
       }
     } else {
@@ -155,7 +155,7 @@ export default class RecentManager extends Signals.EventEmitter {
       try {
         unlock = await this._bookmarkFileMutex.lock();
       } catch (e) {
-        console.error(e);
+        log(e);
         return;
       }
       try {
@@ -179,7 +179,7 @@ export default class RecentManager extends Signals.EventEmitter {
       try {
         unlock = await this._bookmarkFileMutex.lock();
       } catch (e) {
-        console.error(e);
+        log(e);
         return;
       }
       // disconnect from file monitoring
@@ -208,7 +208,7 @@ export default class RecentManager extends Signals.EventEmitter {
     try {
       unlock = await this._bookmarkFileMutex.lock();
     } catch (e) {
-      console.error(e);
+      log(e);
       return [];
     }
     try {
@@ -260,7 +260,7 @@ export default class RecentManager extends Signals.EventEmitter {
           mime_type,
         };
       } catch (e) {
-        console.error(e, `Failed to retrieve information for URI: ${uri}`);
+        log(e, `Failed to retrieve information for URI: ${uri}`);
         return null;
       }
     }).filter(item => item !== null);
@@ -273,7 +273,7 @@ export default class RecentManager extends Signals.EventEmitter {
     try {
       unlock = await this._bookmarkFileMutex.lock();
     } catch (e) {
-      console.error(e);
+      log(e);
       return 0;
     }
     try {
@@ -290,7 +290,7 @@ export default class RecentManager extends Signals.EventEmitter {
     try {
       unlock = await this._bookmarkFileMutex.lock();
     } catch (e) {
-      console.error(e);
+      log(e);
       return;
     }
     try {
@@ -305,7 +305,36 @@ export default class RecentManager extends Signals.EventEmitter {
       this.emit("purged");
     }
   }
-
+  async remove_items(uris) {
+    await this._reload_entries_if_changed();
+    // Wait for the lock, and receive the unlock function.
+    let unlock = false;
+    try {
+      unlock = await this._bookmarkFileMutex.lock();
+    } catch (e) {
+      log(e);
+      return;
+    }
+    
+    let itemRemoved = false;
+    try {
+    	for (const uri of uris) { 
+		    if (this._bookmarkFile.has_item(uri)) {
+		      this._bookmarkFile.remove_item(uri);
+		      itemRemoved = true;
+		    }
+      }
+      this._bookmarkFile.to_file(this._bookmarkFilePath);
+    } finally {
+      // Make sure to release the lock.
+      unlock();
+      if(itemRemoved) {
+		  	for (const uri of uris) { 
+		      this.emit("item-removed", uri);
+		    }
+      }
+    }
+  }
   async remove_item(uri) {
     await this._reload_entries_if_changed();
     // Wait for the lock, and receive the unlock function.
@@ -313,9 +342,10 @@ export default class RecentManager extends Signals.EventEmitter {
     try {
       unlock = await this._bookmarkFileMutex.lock();
     } catch (e) {
-      console.error(e);
+      log(e);
       return;
     }
+    
     let itemRemoved = false;
     try {
       if (this._bookmarkFile.has_item(uri)) {

@@ -181,7 +181,7 @@ const RecentItems = GObject.registerClass(
         try {
           this.togglePrivateMode();
         } catch (e) {
-          console.error(e);
+          log(e);
         }
       });
     
@@ -375,14 +375,14 @@ const RecentItems = GObject.registerClass(
       try {
         unlock = await this._syncMutex.lock();
       } catch (e) {
-        console.error(e);
+        log(e);
         return;
       }
       this._syncInQueue = false;
       try {
         await this._do_sync();
       } catch (e) {
-        console.error(e);
+        log(e);
       } finally {
         // Make sure to release the lock.
         unlock();
@@ -401,14 +401,14 @@ const RecentItems = GObject.registerClass(
         try {
           unlock = await this._syncMutex.lock();
         } catch (e) {
-          console.error(e);
+          log(e);
           return;
         }
         try {
           try {
             await this.recentManager.backup();
           } catch (e) {
-            console.error(e);
+            log(e);
           }
           // Disconnect recent manager signal handler
           if (this.changeHandler) {
@@ -427,14 +427,14 @@ const RecentItems = GObject.registerClass(
         try {
           unlock = await this._syncMutex.lock();
         } catch (e) {
-          console.error(e);
+          log(e);
           return;
         }
         try {
           try {
             await this.recentManager.restore();
           } catch (e) {
-            console.error(e);
+            log(e);
           }
           this._connectChangeHandler();
         } finally {
@@ -467,21 +467,25 @@ const RecentItems = GObject.registerClass(
 
         if (!this.privateModeMenuItem.state) {
           if(itemsRefreshed) {
+          	
             const itemBlacklist = this._extension._settings.get_string('item-blacklist');
             const blacklistList = itemBlacklist.toLowerCase().replace(/\s/g, "").split(",");
-
+						let itemRemoved = false;
+						let removeItems = [];
             for (const item of this._allItems) {
               if (blacklistList.indexOf(item.mime_type.split("/")[0]) !== -1) {
                 const uri = item.uri;
-                await this.recentManager.remove_item(uri);
-                return;
-              }
-
-              if (blacklistList.indexOf("."+item.extension) !== -1) {
+                removeItems.push(uri);
+                itemRemoved = true
+              } else if (blacklistList.indexOf("."+item.extension) !== -1) {
                 const uri = item.uri;
-                await this.recentManager.remove_item(uri);
-                return;
+                removeItems.push(uri);
+                itemRemoved = true
               }
+            }
+            if(itemRemoved){
+              await this.recentManager.remove_items(removeItems);
+            	return;
             }
           } else {
             console.log("refresh modified and visited states");
@@ -627,7 +631,7 @@ const RecentItems = GObject.registerClass(
           return;
         }
       } catch (e) {
-        console.error(e);
+        log(e);
         return;
       }
 
