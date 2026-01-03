@@ -70,7 +70,7 @@ export default class RecentItemsPreferences extends ExtensionPreferences {
     });
 
     label = new Gtk.Label({
-      label: _('Window width (%)'),
+      label: _('Menu width (% of screen)'),
       hexpand: true,
       halign: Gtk.Align.START,
     });
