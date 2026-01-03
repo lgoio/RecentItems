@@ -1,6 +1,7 @@
 import Gio from "gi://Gio";
 import Adw from "gi://Adw";
 import Gtk from "gi://Gtk";
+import Gdk from "gi://Gdk";
 
 import {
   ExtensionPreferences,
@@ -9,8 +10,50 @@ import {
 
 export default class RecentItemsPreferences extends ExtensionPreferences {
   fillPreferencesWindow(window) {
-    // Set the default window size (width, height in pixels)
-    window.set_default_size(800, 600);
+    // Prefer max size (800x900) if screen allows it, otherwise scale down
+    const MAX_W = 800;
+    const MAX_H = 900;
+
+    // these are your fallback ratios for small screens
+    const WIDTH_RATIO  = 0.60; // 60% of screen width
+    const HEIGHT_RATIO = 0.75; // 75% of screen height
+
+    const MIN_W = 600;
+    const MIN_H = 500;
+
+    const display = Gdk.Display.get_default();
+    const surface = window.get_surface();
+
+    let monitor = null;
+    if (surface) {
+      monitor = display.get_monitor_at_surface(surface);
+    }
+    if (!monitor) {
+      monitor = display.get_monitors()?.get_item?.(0) ?? null;
+    }
+
+    if (monitor) {
+      const geometry = monitor.get_geometry();
+      const screenW = geometry.width;
+      const screenH = geometry.height;
+
+      const targetW = Math.round(screenW * WIDTH_RATIO);
+      const targetH = Math.round(screenH * HEIGHT_RATIO);
+
+      // If there is enough space, we hit MAX_W/MAX_H.
+      // Otherwise we use the target sizes.
+      const width  = Math.max(MIN_W, Math.min(MAX_W, targetW));
+      const height = Math.max(MIN_H, Math.min(MAX_H, targetH));
+
+      window.set_default_size(width, height);
+
+      // Optional but recommended: ensure it never becomes too small (state restore)
+      window.set_size_request(MIN_W, MIN_H);
+    } else {
+      // Fallback
+      window.set_default_size(MAX_W, MAX_H);
+      window.set_size_request(MIN_W, MIN_H);
+    }
 
     window._settings = this.getSettings();
 
@@ -141,7 +184,6 @@ export default class RecentItemsPreferences extends ExtensionPreferences {
     // A scrolled window so the text view can grow and scroll
     const scrolledWindow = new Gtk.ScrolledWindow({
       hexpand: true,
-      vexpand: true,
       min_content_height: 100, // Adjust as desired
     });
 
@@ -172,7 +214,6 @@ export default class RecentItemsPreferences extends ExtensionPreferences {
 
     itemBlacklistBox.append(label);
 
-    itemBlacklistBox.append(label);
     itemBlacklistBox.append(scrolledWindow);
 
     label = new Gtk.Label({
@@ -184,6 +225,68 @@ export default class RecentItemsPreferences extends ExtensionPreferences {
 
     itemBlacklistBox.append(label);
     group.add(itemBlacklistBox);
+
+        // Directory Blacklist (one per line)
+    const dirBlacklistBox = new Gtk.Box({
+      orientation: Gtk.Orientation.VERTICAL,
+      spacing: 10,
+      margin_start: 10,
+      margin_end: 10,
+      margin_top: 10,
+      margin_bottom: 10,
+    });
+
+    let dirLabel = new Gtk.Label({
+      label: _("Directory blacklist (one per line)") + ":",
+      hexpand: true,
+      halign: Gtk.Align.START,
+    });
+
+    const dirScrolledWindow = new Gtk.ScrolledWindow({
+      hexpand: true,
+      min_content_height: 100,
+    });
+
+    const dirTextView = new Gtk.TextView({
+      wrap_mode: Gtk.WrapMode.WORD_CHAR,
+    });
+    dirScrolledWindow.set_child(dirTextView);
+
+    const dirTextBuffer = dirTextView.get_buffer();
+
+    // Load existing value
+    const savedDirBlacklist = window._settings.get_string("directory-blacklist");
+    dirTextBuffer.set_text(savedDirBlacklist, -1);
+
+    // Save on changes (normalized: one entry per line, trim empty lines)
+    dirTextBuffer.connect("changed", () => {
+      const startIter = dirTextBuffer.get_start_iter();
+      const endIter = dirTextBuffer.get_end_iter();
+      const rawText = dirTextBuffer.get_text(startIter, endIter, true);
+
+      // Normalize: trim, remove empty lines, keep 1 entry per line
+      const normalized = rawText
+        .split("\n")
+        .map(line => line.trim())
+        .filter(line => line.length > 0)
+        .join("\n");
+
+      window._settings.set_string("directory-blacklist", normalized);
+    });
+
+    dirBlacklistBox.append(dirLabel);
+    dirBlacklistBox.append(dirScrolledWindow);
+
+    const dirExample = new Gtk.Label({
+      label: _("Example") + ": /tmp\n/var/log\n" + "~/Downloads",
+      hexpand: true,
+      selectable: true,
+      halign: Gtk.Align.START,
+    });
+
+    dirBlacklistBox.append(dirExample);
+    group.add(dirBlacklistBox);
+
 
   }
 }

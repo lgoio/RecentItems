@@ -31,6 +31,36 @@ import RecentManager from "./recentManager.js";
 import Mutex from "./mutex.js";
 import MirrorMapping from "./mirrorMapping.js";
 
+function normalizeFsPath(p) {
+  // unify slashes
+  p = p.replace(/\/+/g, "/").trim();
+  // remove trailing slash (except root "/")
+  if (p.length > 1) p = p.replace(/\/$/, "");
+  return p;
+}
+
+function uriToLocalPath(uri) {
+  // Example: file:///home/user/Downloads/Test%20File.txt
+  let path = decodeURIComponent(uri)
+    .replace("file://", "");
+
+  // normalize to use ~ for home, because blacklist may contain ~/...
+  path = path.replace(GLib.get_home_dir(), "~");
+
+  return normalizeFsPath(path);
+}
+
+function isParentPathOf(parentDir, filePath) {
+  parentDir = normalizeFsPath(parentDir);
+  filePath  = normalizeFsPath(filePath);
+
+  // exact match (directory itself)
+  if (filePath === parentDir)
+    return true;
+
+  // parent + boundary
+  return filePath.startsWith(parentDir + "/");
+}
 
 export default class RecentItemsExtension extends Extension {
   constructor(metadata) {
@@ -316,10 +346,7 @@ const RecentItems = GObject.registerClass(
         x_align: Clutter.ActorAlign.START,
       });
 
-      let path = this.mirrorMapping.replaceChars(decodeURIComponent(item.uri)
-      .replace("file://", "")
-      .replace(GLib.get_home_dir(), "~")
-      .replace(/\/[^\/]*$/, "/"));
+      let path = this.mirrorMapping.replaceChars(uriToLocalPath(item.uri)+"/");
       
       // Add a label
       const pathLabel = new St.Label({
@@ -470,19 +497,47 @@ const RecentItems = GObject.registerClass(
           	
             const itemBlacklist = this._extension._settings.get_string('item-blacklist');
             const blacklistList = itemBlacklist.toLowerCase().replace(/\s/g, "").split(",");
-						let itemRemoved = false;
-						let removeItems = [];
+
+            const dirBlacklistRaw = this._extension._settings.get_string("directory-blacklist") || "";
+            const dirBlacklist = dirBlacklistRaw
+              .split("\n")
+              .map(line => line.trim())
+              .filter(line => line.length > 0)
+              .map(line => line.replace(GLib.get_home_dir(), "~"))
+              .map(normalizeFsPath);
+            let itemRemoved = false;
+            let removeItems = [];
+
             for (const item of this._allItems) {
+              const uri = item.uri;
+
+              // MIME / extension blacklist
               if (blacklistList.indexOf(item.mime_type.split("/")[0]) !== -1) {
-                const uri = item.uri;
                 removeItems.push(uri);
-                itemRemoved = true
-              } else if (blacklistList.indexOf("."+item.extension) !== -1) {
-                const uri = item.uri;
+                itemRemoved = true;
+                continue;
+              }
+
+              if (blacklistList.indexOf("." + item.extension) !== -1) {
                 removeItems.push(uri);
-                itemRemoved = true
+                itemRemoved = true;
+                continue;
+              }
+
+              // directory blacklist
+              if (dirBlacklist.length > 0 && uri.startsWith("file://")) {
+                const localPath = uriToLocalPath(uri);
+
+                for (const blockedDir of dirBlacklist) {
+                  if (isParentPathOf(blockedDir, localPath)) {
+                    removeItems.push(uri);
+                    itemRemoved = true;
+                    break;
+                  }
+                }
               }
             }
+
             if(itemRemoved){
               await this.recentManager.remove_items(removeItems);
             	return;

@@ -26,6 +26,14 @@
         Recent items with these MIME types will not be shown.
       </description>
     </key>
+    
+    <key name="directory-blacklist" type="s">
+      <default>''</default>
+      <summary>Directory blacklist (one per line)</summary>
+      <description>
+        Directories that should be ignored. One directory per line.
+      </description>
+    </key>
 
     <key name="private-mode" type="b">
       <default>false</default>

@@ -63,6 +63,32 @@ declare -A window_width_percentage=(
   ["zh_CN"]="菜单宽度（屏幕百分比）"
 )
 
+declare -A directory_blacklist_one_per_line=(
+  ["en"]="Directory blacklist (one per line)"
+  ["ar"]="القائمة السوداء للأدلة (مجلد لكل سطر)"
+  ["ca"]="Llista negra de directoris (un per línia)"
+  ["cs"]="Seznam zakázaných adresářů (jeden na řádek)"
+  ["de"]="Verzeichnis-Blacklist (eins pro Zeile)"
+  ["el"]="Μαύρη λίστα καταλόγων (ένα ανά γραμμή)"
+  ["es"]="Lista negra de directorios (uno por línea)"
+  ["eu"]="Direktorioen zerrenda beltza (lerroko bat)"
+  ["fa"]="لیست سیاه پوشه‌ها (هر خط یک مورد)"
+  ["fi"]="Hakemistojen estolista (yksi per rivi)"
+  ["fr"]="Liste noire de répertoires (un par ligne)"
+  ["hu"]="Könyvtár tiltólista (soronként egy)"
+  ["it"]="Blacklist directory (uno per riga)"
+  ["ja"]="ディレクトリのブラックリスト（1行に1つ）"
+  ["nl"]="Mappen-zwarte lijst (één per regel)"
+  ["oc"]="Lista negra de repertòris (un per linha)"
+  ["pl"]="Czarna lista katalogów (jeden na linię)"
+  ["pt_BR"]="Lista de bloqueio de diretórios (um por linha)"
+  ["ru"]="Чёрный список каталогов (один на строку)"
+  ["sk"]="Zoznam zakázaných priečinkov (jeden na riadok)"
+  ["tr"]="Dizin engel listesi (satır başına bir)"
+  ["uk"]="Чорний список каталогів (один на рядок)"
+  ["zh_CN"]="目录黑名单（每行一个）"
+)
+
 # Define translations for each string
 declare -A private_mode=(
   ["en"]="Private mode"
@@ -336,7 +362,7 @@ for lang in "ar" "ca" "cs" "de" "el" "es" "eu" "fa" "fi" "fr" "hu" "it" "ja" "nl
   echo "msgid \"\"" > "$PO_FILE"
   echo "msgstr \"\"" >> "$PO_FILE"
   echo "\"Content-Type: text/plain; charset=UTF-8\"" >> "$PO_FILE"
-  for key in page_of show_deleted_files no_items_found window_width_percentage private_mode clear_all_recent_items recent_item_settings settings blacklist example search item_count; do
+  for key in page_of show_deleted_files no_items_found window_width_percentage directory_blacklist_one_per_line private_mode clear_all_recent_items recent_item_settings settings blacklist example search item_count; do
     declare -n translations=$key
     echo "" >> "$PO_FILE"
     echo "msgid \"${translations[en]}\"" >> "$PO_FILE"

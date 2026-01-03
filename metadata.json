@@ -6,5 +6,5 @@
   "settings-schema": "org.gnome.shell.extensions.enhanced-recent-items",
   "shell-version": ["45", "46", "47", "48"],
   "gettext-domain": "RecentItems@lgo.io",
-  "version": 33
+  "version": 34
 }
