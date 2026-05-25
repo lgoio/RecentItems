@@ -4,7 +4,7 @@
   "uuid": "RecentItems@lgo.io",
   "url": "https://github.com/lgoio/RecentItems",
   "settings-schema": "org.gnome.shell.extensions.enhanced-recent-items",
-  "shell-version": ["45", "46", "47", "48"],
+  "shell-version": ["45", "46", "47", "48", "49", "50"],
   "gettext-domain": "RecentItems@lgo.io",
   "version": 34
 }
